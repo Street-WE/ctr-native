@@ -81,9 +81,31 @@ static void *LOAD_ReadLooseRacerModel(int characterID)
 }
 #endif
 
-static void *sLooseRacerFileBases[LOAD_CHARACTER_ID_COUNT];
-static struct Model *sLooseRacerModels[LOAD_CHARACTER_ID_COUNT + 1];
+static void *sLooseRacerFileBases[LOOSE_RACER_CHARACTER_COUNT];
+static struct Model *sLooseRacerModels[LOOSE_RACER_CHARACTER_COUNT + 1];
 static int sLooseRacerModelCount;
+
+void LOAD_LoadAllLooseRacerModels(void)
+{
+    int outputIndex = 0;
+
+    memset(sLooseRacerFileBases, 0, sizeof(sLooseRacerFileBases));
+    memset(sLooseRacerModels, 0, sizeof(sLooseRacerModels));
+
+    for (int characterID = 0;
+         characterID < LOOSE_RACER_CHARACTER_COUNT;
+         characterID++)
+    {
+        void *model = LOAD_ReadLooseRacerModel(characterID);
+
+        if (model != NULL)
+        {
+            sLooseRacerFileBases[outputIndex++] = model;
+        }
+    }
+
+    sLooseRacerModelCount = outputIndex;
+}
 
 void LOAD_LoadLooseRacerModels(int racerCount)
 {
@@ -201,6 +223,11 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 
 	struct GameTracker *gGT = sdata->gGT;
 	gameMode1 = gGT->gameMode1;
+
+	if ((gameMode1 & MAIN_MENU) != 0)
+	{
+		LOAD_LoadAllLooseRacerModels();
+	}
 
 	int lastFileIndexMPK;
 

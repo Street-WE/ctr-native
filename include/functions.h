@@ -21,6 +21,7 @@ struct Model **LOAD_GetLooseRacerModelList(void);
 void LOAD_LoadLooseRacerModels(int racerCount);
 void LOAD_FinalizeLooseRacerModels(void);
 void LOAD_ClearLooseRacerModels(void);
+void LOAD_LoadAllLooseRacerModels(void);
 
 void BOTS_Adv_AdjustDifficulty(void);
 void BOTS_UpdateGlobals(void);
