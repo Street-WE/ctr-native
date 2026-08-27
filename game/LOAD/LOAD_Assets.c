@@ -18,69 +18,6 @@ void LOAD_RunPtrMap(char *origin, int *patchArr, int numPtrs)
 	}
 }
 
-enum
-{
-    LOOSE_RACER_CHARACTER_COUNT = NITROS_OXIDE + 1,
-};
-
-#if defined(CTR_NATIVE)
-#include <platform/native_assets.h>
-
-static void *LOAD_ReadLooseRacerModel(int characterID)
-{
-    static const char *const paths[LOOSE_RACER_CHARACTER_COUNT] = {
-		"mods/racers/crash.ctr",    // 0
-		"mods/racers/cortex.ctr",   // 1
-		"mods/racers/tiny.ctr",     // 2
-		"mods/racers/coco.ctr",     // 3
-		"mods/racers/ngin.ctr",     // 4
-		"mods/racers/dingo.ctr",    // 5
-		"mods/racers/polar.ctr",    // 6
-		"mods/racers/pura.ctr",     // 7
-		"mods/racers/pinstripe.ctr",// 8
-		"mods/racers/papu.ctr",     // 9
-		"mods/racers/roo.ctr",      // 10
-		"mods/racers/joe.ctr",      // 11
-		"mods/racers/ntropy.ctr",   // 12
-		"mods/racers/pen.ctr",      // 13
-		"mods/racers/fake.ctr",     // 14
-		"mods/racers/oxide.ctr",    // 15
-	};
-
-	if ((u32)characterID >= len(paths))
-	{
-		return NULL;
-	}
-
-    struct NativeAssetsByteBuffer file;
-    if (!NativeAssets_ReadBytes(paths[characterID],
-                                NATIVE_ASSET_READ_DATA_FILE, &file))
-    {
-        return NULL;
-    }
-
-    void *modelFile = MEMPACK_AllocMem(file.size);
-	memcpy(modelFile, file.data, file.size);
-	NativeAssets_FreeBytes(&file);
-
-	int ptrMapOffset = *(int *)modelFile;
-	char *modelData = (char *)modelFile + LOAD_MODEL_FILE_HEADER_BYTES;
-
-	if (ptrMapOffset >= 0)
-	{
-		struct DramPointerMap *pointerMap =
-			(struct DramPointerMap *)&modelData[ptrMapOffset];
-
-		LOAD_RunPtrMap(
-			modelData,
-			DRAM_GETOFFSETS(pointerMap),
-			pointerMap->numBytes >> DRAM_POINTER_MAP_WORD_SHIFT);
-	}
-
-    return modelData;
-}
-#endif
-
 #if defined(CTR_NATIVE)
 #define STBI_ONLY_PNG
 #define STBI_NO_STDIO
@@ -285,9 +222,94 @@ static void *LOAD_ReadLooseRacerModel(int characterID)
 }
 #endif
 
+enum
+{
+    LOOSE_RACER_CHARACTER_COUNT = NITROS_OXIDE + 1,
+};
+
+#if defined(CTR_NATIVE)
+#include <platform/native_assets.h>
+
+static void *LOAD_ReadLooseRacerModel(int characterID)
+{
+    static const char *const paths[LOOSE_RACER_CHARACTER_COUNT] = {
+		"mods/racers/crash.ctr",    // 0
+		"mods/racers/cortex.ctr",   // 1
+		"mods/racers/tiny.ctr",     // 2
+		"mods/racers/coco.ctr",     // 3
+		"mods/racers/ngin.ctr",     // 4
+		"mods/racers/dingo.ctr",    // 5
+		"mods/racers/polar.ctr",    // 6
+		"mods/racers/pura.ctr",     // 7
+		"mods/racers/pinstripe.ctr",// 8
+		"mods/racers/papu.ctr",     // 9
+		"mods/racers/roo.ctr",      // 10
+		"mods/racers/joe.ctr",      // 11
+		"mods/racers/ntropy.ctr",   // 12
+		"mods/racers/pen.ctr",      // 13
+		"mods/racers/fake.ctr",     // 14
+		"mods/racers/oxide.ctr",    // 15
+	};
+
+	if ((u32)characterID >= len(paths))
+	{
+		return NULL;
+	}
+
+    struct NativeAssetsByteBuffer file;
+    if (!NativeAssets_ReadBytes(paths[characterID],
+                                NATIVE_ASSET_READ_DATA_FILE, &file))
+    {
+        return NULL;
+    }
+
+    void *modelFile = MEMPACK_AllocMem(file.size);
+	memcpy(modelFile, file.data, file.size);
+	NativeAssets_FreeBytes(&file);
+
+	int ptrMapOffset = *(int *)modelFile;
+	char *modelData = (char *)modelFile + LOAD_MODEL_FILE_HEADER_BYTES;
+
+	if (ptrMapOffset >= 0)
+	{
+		struct DramPointerMap *pointerMap =
+			(struct DramPointerMap *)&modelData[ptrMapOffset];
+
+		LOAD_RunPtrMap(
+			modelData,
+			DRAM_GETOFFSETS(pointerMap),
+			pointerMap->numBytes >> DRAM_POINTER_MAP_WORD_SHIFT);
+	}
+
+    return modelData;
+}
+#endif
+
 static void *sLooseRacerFileBases[LOOSE_RACER_CHARACTER_COUNT];
 static struct Model *sLooseRacerModels[LOOSE_RACER_CHARACTER_COUNT + 1];
 static int sLooseRacerModelCount;
+
+void LOAD_LoadAllLooseRacerModels(void)
+{
+    int outputIndex = 0;
+
+    memset(sLooseRacerFileBases, 0, sizeof(sLooseRacerFileBases));
+    memset(sLooseRacerModels, 0, sizeof(sLooseRacerModels));
+
+    for (int characterID = 0;
+         characterID < LOOSE_RACER_CHARACTER_COUNT;
+         characterID++)
+    {
+        void *model = LOAD_ReadLooseRacerModel(characterID);
+
+        if (model != NULL)
+        {
+            sLooseRacerFileBases[outputIndex++] = model;
+        }
+    }
+
+    sLooseRacerModelCount = outputIndex;
+}
 
 void LOAD_LoadLooseRacerModels(int racerCount)
 {
@@ -463,7 +485,12 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 			return sdata->ptrMPK;
 		}
 
-		if ((gameMode1 & (TIME_TRIAL | MAIN_MENU)) != MAIN_MENU)
+		if ((gameMode1 & MAIN_MENU) != 0)
+		{
+			// Character select needs every racer model available.
+			LOAD_LoadAllLooseRacerModels();
+		}
+		else if ((gameMode1 & (TIME_TRIAL | MAIN_MENU)) != MAIN_MENU)
 		{
 			LOAD_Robots1P(data.characterIDs[0]);
 		}
