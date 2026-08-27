@@ -285,8 +285,8 @@ static void *LOAD_ReadLooseRacerModel(int characterID)
 }
 #endif
 
-static void *sLooseRacerFileBases[LOAD_CHARACTER_ID_COUNT];
-static struct Model *sLooseRacerModels[LOAD_CHARACTER_ID_COUNT + 1];
+static void *sLooseRacerFileBases[LOOSE_RACER_CHARACTER_COUNT];
+static struct Model *sLooseRacerModels[LOOSE_RACER_CHARACTER_COUNT + 1];
 static int sLooseRacerModelCount;
 
 void LOAD_LoadLooseRacerModels(int racerCount)

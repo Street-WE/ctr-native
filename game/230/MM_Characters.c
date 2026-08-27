@@ -163,11 +163,28 @@ struct Model *MM_Characters_GetModelByName(const char *name)
 	struct Model **models;
 	struct Model *model;
 	struct Level *level1 = sdata->gGT->level1;
+	struct Model **looseModels = LOAD_GetLooseRacerModelList();
 
 	// if LEV is invalid
 	if (level1 == NULL)
 	{
 		return NULL;
+	}
+
+	if ((looseModels != NULL) && (looseModels[0] != NULL))
+	{
+		for (int i = 0; looseModels[i] != NULL; i++)
+		{
+			model = looseModels[i];
+
+			if ((ModelName_ReadWord(model->name, 0) == ModelName_ReadWord(name, 0)) &&
+				(ModelName_ReadWord(model->name, 1) == ModelName_ReadWord(name, 1)) &&
+				(ModelName_ReadWord(model->name, 2) == ModelName_ReadWord(name, 2)) &&
+				(ModelName_ReadWord(model->name, 3) == ModelName_ReadWord(name, 3)))
+			{
+				return model;
+			}
+		}
 	}
 
 	models = level1->ptrModelsPtrArray;
