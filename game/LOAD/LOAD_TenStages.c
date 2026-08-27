@@ -473,6 +473,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		if (lev != 0)
 		{
 			DecalGlobal_Store(gGT, lev->levTexLookup);
+			LOAD_ApplyLooseRacerIcons(gGT);
 		}
 
 		DebugFont_Init(gGT);

@@ -81,6 +81,210 @@ static void *LOAD_ReadLooseRacerModel(int characterID)
 }
 #endif
 
+#if defined(CTR_NATIVE)
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#define STBI_NO_GIF
+#define STBI_NO_HDR
+#define STBI_NO_LINEAR
+#define STBI_NO_THREAD_LOCALS
+#define STB_IMAGE_IMPLEMENTATION
+#include "../../externals/SDL/src/video/stb_image.h"
+
+	enum
+	{
+		LOOSE_RACER_ICON_COUNT = NITROS_OXIDE + 1,
+
+		LOOSE_ICON_WIDTH = 44,
+		LOOSE_ICON_HEIGHT = 26,
+		LOOSE_ICON_WORDS_PER_ROW = (LOOSE_ICON_WIDTH + 3) / 4, // 11
+	};
+
+	static const char *const sLooseRacerIconPaths[LOOSE_RACER_ICON_COUNT] = {
+		"mods/racer_icons/crash.png",
+		"mods/racer_icons/cortex.png",
+		"mods/racer_icons/tiny.png",
+		"mods/racer_icons/coco.png",
+		"mods/racer_icons/ngin.png",
+		"mods/racer_icons/dingo.png",
+		"mods/racer_icons/polar.png",
+		"mods/racer_icons/pura.png",
+		"mods/racer_icons/pinstripe.png",
+		"mods/racer_icons/papu.png",
+		"mods/racer_icons/roo.png",
+		"mods/racer_icons/joe.png",
+		"mods/racer_icons/ntropy.png",
+		"mods/racer_icons/pen.png",
+		"mods/racer_icons/fake.png",
+		"mods/racer_icons/oxide.png",
+	};
+
+	static int LOAD_ReadLooseRacerIcon(
+    const char *path,
+    u16 packedPixels[LOOSE_ICON_WORDS_PER_ROW * LOOSE_ICON_HEIGHT],
+    u16 clut[16])
+	{
+		struct NativeAssetsByteBuffer file;
+		unsigned char *rgba;
+		int width;
+		int height;
+		int channels;
+		int paletteCount = 1; // Index 0 is reserved for transparency.
+
+		memset(packedPixels, 0,
+			   LOOSE_ICON_WORDS_PER_ROW * LOOSE_ICON_HEIGHT * sizeof(u16));
+		memset(clut, 0, 16 * sizeof(u16));
+
+		if (!NativeAssets_ReadBytes(
+				path,
+				NATIVE_ASSET_READ_DATA_FILE,
+				&file))
+		{
+			return 0;
+		}
+
+		rgba = stbi_load_from_memory(
+			file.data,
+			file.size,
+			&width,
+			&height,
+			&channels,
+			4);
+
+		NativeAssets_FreeBytes(&file);
+
+		if ((rgba == NULL) ||
+			(width != LOOSE_ICON_WIDTH) ||
+			(height != LOOSE_ICON_HEIGHT))
+		{
+			if (rgba != NULL)
+			{
+				stbi_image_free(rgba);
+			}
+
+			return 0;
+		}
+
+		for (int y = 0; y < LOOSE_ICON_HEIGHT; y++)
+		{
+			for (int x = 0; x < LOOSE_ICON_WIDTH; x++)
+			{
+				const unsigned char *source =
+					&rgba[(y * LOOSE_ICON_WIDTH + x) * 4];
+
+				int paletteIndex;
+				u16 rgb555;
+
+				// Fully transparent PNG pixels use PS1 CLUT entry zero.
+				if (source[3] == 0)
+				{
+					paletteIndex = 0;
+				}
+				else
+				{
+					rgb555 =
+						((u16)(source[0] >> 3) << 0) |
+						((u16)(source[1] >> 3) << 5) |
+						((u16)(source[2] >> 3) << 10);
+
+					// RGB555 zero is transparent in CTR's texture renderer.
+					if (rgb555 == 0)
+					{
+						// RGB555 zero is transparent; bit 15 makes black visible.
+						rgb555 = 0x8000;
+					}
+
+					for (paletteIndex = 1;
+						 paletteIndex < paletteCount;
+						 paletteIndex++)
+					{
+						if (clut[paletteIndex] == rgb555)
+						{
+							break;
+						}
+					}
+
+					if (paletteIndex == paletteCount)
+					{
+						if (paletteCount == 16)
+						{
+							stbi_image_free(rgba);
+							return 0;
+						}
+
+						clut[paletteCount] = rgb555;
+						paletteCount++;
+					}
+				}
+
+				packedPixels[
+					y * LOOSE_ICON_WORDS_PER_ROW + (x / 4)
+				] |= (u16)(paletteIndex << ((x & 3) * 4));
+			}
+		}
+
+		stbi_image_free(rgba);
+		return 1;
+	}
+
+	void LOAD_ApplyLooseRacerIcons(struct GameTracker *gGT)
+	{
+		for (int characterID = 0;
+			 characterID < LOOSE_RACER_ICON_COUNT;
+			 characterID++)
+		{
+			struct Icon *icon;
+			u16 packedPixels[LOOSE_ICON_WORDS_PER_ROW * LOOSE_ICON_HEIGHT];
+			u16 clut[16];
+
+			if (!LOAD_ReadLooseRacerIcon(
+					sLooseRacerIconPaths[characterID],
+					packedPixels,
+					clut))
+			{
+				continue;
+			}
+
+			icon = gGT->ptrIcons[
+				data.MetaDataCharacters[characterID].iconID
+			];
+
+			if (icon == NULL)
+			{
+				continue;
+			}
+
+			struct TextureLayout *layout = &icon->texLayout;
+
+			int pageX = (layout->tpage & 0x0f) << 6;
+			int pageY = (layout->tpage & 0x10) ? 256 : 0;
+
+			int textureX = pageX + (layout->u0 / 4);
+			int textureY = pageY + layout->v0;
+
+			int clutX = (layout->clut & 0x3f) << 4;
+			int clutY = layout->clut >> 6;
+
+			RECT16 textureRect = {
+				textureX,
+				textureY,
+				LOOSE_ICON_WORDS_PER_ROW,
+				LOOSE_ICON_HEIGHT,
+			};
+
+			RECT16 clutRect = {
+				clutX,
+				clutY,
+				16,
+				1,
+			};
+
+			LoadImage(&textureRect, packedPixels);
+			LoadImage(&clutRect, clut);
+		}
+}
+#endif
+
 static void *sLooseRacerFileBases[LOAD_CHARACTER_ID_COUNT];
 static struct Model *sLooseRacerModels[LOAD_CHARACTER_ID_COUNT + 1];
 static int sLooseRacerModelCount;
