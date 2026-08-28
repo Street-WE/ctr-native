@@ -45,6 +45,9 @@ void CDSYS_SpuGetMaxSampleAtOffset(int xaCurrOffset);
 #endif
 int CDSYS_XAGetNumTracks(int categoryID);
 int CDSYS_XAGetTrackLength(int categoryID, int xaID);
+#if defined(CTR_NATIVE)
+int CDSYS_XAPlayWav(const char *relativePath, int *durationTicks);
+#endif
 int CDSYS_XAPlay(int categoryID, int xaID);
 void CDSYS_XAPauseRequest(void);
 void CDSYS_XAPauseForce(void);

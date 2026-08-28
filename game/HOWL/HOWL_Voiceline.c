@@ -1,5 +1,58 @@
 #include <common.h>
 
+#if defined(CTR_NATIVE)
+static const char *const sRacerVoiceNames[16] = {
+	"crash",
+	"cortex",
+	"tiny",
+	"coco",
+	"ngin",
+	"dingo",
+	"polar",
+	"pura",
+	"pinstripe",
+	"papu",
+	"roo",
+	"joe",
+	"ntropy",
+	"pen",
+	"fake",
+	"oxide",
+};
+
+static int Voiceline_TryPlayWav(
+	u32 characterID,
+	u32 voiceSetIndex,
+	u32 variantIndex,
+	int *durationTicks)
+{
+	char wavPath[128];
+
+	if ((characterID >= 16) ||
+	    (voiceSetIndex >= 8) ||
+	    (variantIndex >= 2))
+	{
+		return 0;
+	}
+
+	int written = snprintf(
+		wavPath,
+		sizeof(wavPath),
+		"mods/racer_voices/%s/set%02u_%u.wav",
+		sRacerVoiceNames[characterID],
+		(unsigned int)voiceSetIndex,
+		(unsigned int)variantIndex);
+
+	if ((written <= 0) ||
+	    ((size_t)written >= sizeof(wavPath)))
+	{
+		return 0;
+	}
+
+	return CDSYS_XAPlayWav(wavPath, durationTicks);
+}
+#endif
+
 // does not really touch voiceline
 void Voiceline_PoolInit(void)
 {
@@ -225,6 +278,36 @@ void Voiceline_RequestPlay(u32 voiceID, u32 characterID, u32 characterID2)
 	}
 
 playImmediate:
+#if defined(CTR_NATIVE)
+	/*
+	 * The WAV override uses the streamed-audio channel. Do not interrupt
+	 * another active voice stream; retain the original OtherFX fallback
+	 * when the stream is occupied.
+	 */
+	if ((voiceType < 2) && (sdata->XA_State == XA_IDLE))
+	{
+		int durationTicks = 0;
+		u32 variantIndex =
+			Voiceline_RequestPlay_NextAudioRNG() & 1;
+
+		if (Voiceline_TryPlayWav(
+			    characterID,
+			    voiceType,
+			    variantIndex,
+			    &durationTicks))
+		{
+			sdata->voicelineCooldown =
+				(s16)durationTicks + 0x1e;
+
+			sdata->timeSet2[characterID] =
+				sdata->gGT->frameTimer_MainFrame_ResetDB;
+
+			return;
+		}
+	}
+#endif
+
+	// Original sound-bank fallback.
 	if (voiceType == 0)
 	{
 		OtherFX_Play((characterID + 0x1c) & 0xffff, 2);
@@ -315,6 +398,23 @@ void Voiceline_StartPlay(struct Item *voiceLine)
 	u32 rng = Voiceline_RequestPlay_NextAudioRNG();
 	u32 voiceIndex = rng % numVoiceIDs;
 	u32 xaID = (u16)voiceIDs[voiceIndex];
+
+	#if defined(CTR_NATIVE)
+		{
+			int durationTicks = 0;
+
+			if (Voiceline_TryPlayWav(
+					characterID,
+					voiceSetIndex,
+					voiceIndex,
+					&durationTicks))
+			{
+				sdata->voicelineCooldown =
+					(s16)durationTicks + 0x1e;
+				return;
+			}
+		}
+	#endif
 
 	if (CDSYS_XAPlay(CDSYS_XA_TYPE_GAME, xaID) == 0)
 	{
