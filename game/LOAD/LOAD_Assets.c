@@ -502,13 +502,20 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 	else if ((levelLOD == LOAD_LEVEL_LOD_RELIC) || ((gameMode1 & TIME_TRIAL) != 0))
 	{
 	LoadHighAndPack:
-		// Do NOT switch the order to optimize Relic,
-		// if HI+IDs[1] and PACK+IDs[0] is loaded,
-		// then mask-grab breaks for all characters
-		// on Hot Air Skyway (except Crash Bandicoot)
+		if ((gameMode1 & TIME_TRIAL) != 0)
+		{
+			/*
+			 * Load the human player's loose racer model.
+			 * characterIDs[1] is reserved for the ghost.
+			 */
+			LOAD_LoadLooseRacerModels(1);
+		}
 
-		// Load boss or ghost [1]
-		lastFileIndexMPK = BI_TIMETRIALPACK + data.characterIDs[1];
+		/*
+		 * Load boss or ghost model.
+		 */
+		lastFileIndexMPK =
+			BI_TIMETRIALPACK + data.characterIDs[1];
 	}
 
 	// else if (levelLOD == LOAD_LEVEL_LOD_2P)

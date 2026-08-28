@@ -390,13 +390,26 @@ void MainInit_Drivers(struct GameTracker *gGT)
 		GhostTape_Start();
 
 #if defined(CTR_NATIVE)
-		struct Model **humanPlyrDriverModel = &gGT->threadBuckets[PLAYER].thread->inst->model;
+    struct Thread *humanThread =
+        gGT->threadBuckets[PLAYER].thread;
 
-		// that's characterIDs[1] from the MPK
-		// humanGhost = *humanPlyrDriverModel,
+    if ((humanThread != NULL) &&
+        (humanThread->inst != NULL))
+    {
+        int characterID = data.characterIDs[0];
 
-		// then replace with intended P1 model
-		*humanPlyrDriverModel = data.driverModelExtras[0].model;
+        struct Model *selectedModel =
+            VehBirth_GetModelByName(
+                data.MetaDataCharacters[
+                    characterID
+                ].name_Debug);
+
+        if (selectedModel != NULL)
+        {
+            humanThread->inst->model =
+                selectedModel;
+        }
+    }
 #endif
 	}
 }

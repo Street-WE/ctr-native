@@ -497,7 +497,7 @@ void RB_Warpball_ThTick(struct Thread *t)
 		tw->driverParent->angle = tw->dir.y;
 	}
 	tw->driverParent->forwardDir = tw->dir.x;
-	tw->driverParent->reserves += 12;
+	tw->driverParent->reserves += 36;
 
 	PlaySound3D_Flags(&tw->soundIDCount, 0x4e, inst);
 
