@@ -71,10 +71,16 @@ void LOAD_Callback_PatchMem(struct LoadQueueSlot *lqs)
 	MEMPACK_SwapPacks(sdata->gGT->activeMempackIndex);
 }
 
-void LOAD_Callback_DriverModels(struct LoadQueueSlot *lqs)
+void LOAD_Callback_DriverModels(
+    struct LoadQueueSlot *lqs)
 {
-	sdata->load_inProgress = 0;
-	sdata->ptrMPK = (int)lqs->ptrDestination;
+    Platform_Log(
+        "Driver MPK callback: destination=%p\n",
+        lqs->ptrDestination);
+
+    sdata->load_inProgress = 0;
+    sdata->ptrMPK =
+        (int)lqs->ptrDestination;
 }
 
 void LOAD_HubCallback(struct LoadQueueSlot *lqs)

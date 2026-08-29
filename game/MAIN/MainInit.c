@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 #ifdef CTR_NATIVE
 static void MainInit_InitVisMemBspListNodes(struct VisMem *visMem, struct mesh_info *mesh)
@@ -398,11 +399,17 @@ void MainInit_Drivers(struct GameTracker *gGT)
     {
         int characterID = data.characterIDs[0];
 
-        struct Model *selectedModel =
-            VehBirth_GetModelByName(
-                data.MetaDataCharacters[
-                    characterID
-                ].name_Debug);
+        const struct CharacterDef *character =
+			CharacterRegistry_GetByID(characterID);
+
+		struct Model *selectedModel = NULL;
+
+		if (character != NULL)
+		{
+			selectedModel =
+				VehBirth_GetModelByName(
+					character->assetName);
+		}
 
         if (selectedModel != NULL)
         {

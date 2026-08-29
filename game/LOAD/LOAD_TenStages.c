@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterIconCache.h>
 
 void (*mainMenuInit[])() = {MM_JumpTo_Title_FirstTime, MM_JumpTo_Characters, MM_JumpTo_TrackSelect, MM_JumpTo_BattleSetup, CS_Garage_Init, MM_JumpTo_Scrapbook};
 
@@ -472,8 +473,25 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 		if (lev != 0)
 		{
-			DecalGlobal_Store(gGT, lev->levTexLookup);
+			DecalGlobal_Store(
+				gGT,
+				lev->levTexLookup);
+
 			LOAD_ApplyLooseRacerIcons(gGT);
+
+			if (gGT->levelID == MAIN_MENU_LEVEL)
+{
+				/*
+				 * RestoreIDs may have populated the cache before the
+				 * returning menu level replaced its VRAM and CLUT data.
+				 */
+				MM_Characters_ReloadPageIcons();
+			}
+			else if ((gGT->gameMode1 & MAIN_MENU) == 0)
+			{
+				CharacterIconCache_LoadRaceCharacters(
+					gGT);
+			}
 		}
 
 		DebugFont_Init(gGT);

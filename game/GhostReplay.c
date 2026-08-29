@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 internal s16 Ghost_LerpRot12(s16 curr, s16 next, u16 t)
 {
@@ -389,7 +390,17 @@ void GhostReplay_Init1(void)
 		ghostDriver->ghostTape = sdata->ptrGhostTape[i];
 
 		s32 charID = data.characterIDs[i + 1];
-		struct Model *model = VehBirth_GetModelByName(data.MetaDataCharacters[charID].name_Debug);
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByID(charID);
+
+		struct Model *model =
+			character != NULL
+				? VehBirth_GetModelByName(
+					character->assetName)
+				: NULL;
+
+		if (model == NULL)
+			continue;
 		struct Instance *inst = INSTANCE_Birth3D(model, model->name, t);
 		t->inst = inst;
 
@@ -481,9 +492,26 @@ void GhostReplay_Init2(void)
 		}
 
 		s32 characterID = data.characterIDs[characterIndex];
-		struct Model *model = VehBirth_GetModelByName(data.MetaDataCharacters[characterID].name_Debug);
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByID(characterID);
 
-		driver->wheelSize = (characterID != NITROS_OXIDE) ? 0xccc : 0;
+		struct Model *model =
+			character != NULL
+				? VehBirth_GetModelByName(
+					character->assetName)
+				: NULL;
+
+		if (model == NULL)
+			continue;
+
+		if (!CharacterRegistry_HasWheels(characterID))
+		{
+			driver->wheelSize = 0;
+		}
+		else
+		{
+			driver->wheelSize = 0xccc;
+		}
 
 		struct Instance *inst = driver->instSelf;
 		char *name = (ghostID != 0) ? sdata->s_ghost1 : sdata->s_ghost0;

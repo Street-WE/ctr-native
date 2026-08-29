@@ -145,6 +145,19 @@ static void MM_Characters_DrawPageHint(void)
         JUSTIFY_CENTER | WHITE);
 }
 
+void MM_Characters_ReloadPageIcons(void)
+{
+    struct GameTracker *gGT =
+        sdata->gGT;
+
+    if (gGT == NULL)
+        return;
+
+    CharacterIconCache_LoadRosterPage(
+        gGT,
+        s_characterPage);
+}
+
 void MM_Characters_AnimateColors(u8 *colorData, s16 playerID, s16 flag)
 {
 	u8 colorAdjustmentValue;
@@ -401,7 +414,9 @@ void MM_Characters_DrawWindows(b32 boolShowDrivers)
 		pb->rot.z = 0;
 
 		// player -> instance
-		struct Instance *driverInst = gGT->drivers[playerIndex]->instSelf;
+		struct Driver *driver = gGT->drivers[playerIndex];
+
+		struct Instance *driverInst = driver->instSelf;
 
 		// Make Visible
 		driverInst->flags &= ~HIDE_MODEL;
@@ -426,6 +441,16 @@ void MM_Characters_DrawWindows(b32 boolShowDrivers)
 		idpp[playerIndex].pushBuffer = pb;
 
 		s16 *currCharacterID = &D230.characterSelectPlayerState.currentCharacterID[playerIndex];
+
+		/*
+		 * Character select reuses an existing Driver while replacing its
+		 * model, so wheel size must be refreshed for the displayed character.
+		 */
+		driver->wheelSize =
+			CharacterRegistry_HasWheels(
+				*currCharacterID)
+				? 0xccc
+				: 0;
 
 		driverInst->animFrame = 0;
 		driverInst->animIndex = 0;

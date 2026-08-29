@@ -6,6 +6,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [CRASH_BANDICOOT] = {
         .id = CRASH_BANDICOOT,
         .assetName = "crash",
+        .driverPackCharacterID = CRASH_BANDICOOT,
         .displayName = "Rob-N-Hood",
         .shortName = "R. Hood",
         .engineClass = BALANCED,
@@ -15,6 +16,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [NEO_CORTEX] = {
         .id = NEO_CORTEX,
         .assetName = "cortex",
+        .driverPackCharacterID = NEO_CORTEX,
         .displayName = "Rocket Racer",
         .shortName = "R. Racer",
         .engineClass = SPEED,
@@ -24,6 +26,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [TINY_TIGER] = {
         .id = TINY_TIGER,
         .assetName = "tiny",
+        .driverPackCharacterID = TINY_TIGER,
         .displayName = "Sam Sinister",
         .shortName = "Sinister",
         .engineClass = SPEED,
@@ -33,6 +36,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [COCO_BANDICOOT] = {
         .id = COCO_BANDICOOT,
         .assetName = "coco",
+        .driverPackCharacterID = COCO_BANDICOOT,
         .displayName = "Willa the Witch",
         .shortName = "Willa",
         .engineClass = ACCEL,
@@ -42,6 +46,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [N_GIN] = {
         .id = N_GIN,
         .assetName = "ngin",
+        .driverPackCharacterID = N_GIN,
         .displayName = "Ann Droid",
         .shortName = "A. Droid",
         .engineClass = ACCEL,
@@ -51,6 +56,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [DINGODILE] = {
         .id = DINGODILE,
         .assetName = "dingo",
+        .driverPackCharacterID = DINGODILE,
         .displayName = "Commander Cold",
         .shortName = "C. Cold",
         .engineClass = SPEED,
@@ -60,6 +66,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [POLAR] = {
         .id = POLAR,
         .assetName = "polar",
+        .driverPackCharacterID = POLAR,
         .displayName = "Gov Broadside",
         .shortName = "Governor",
         .engineClass = TURN,
@@ -69,6 +76,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [PURA] = {
         .id = PURA,
         .assetName = "pura",
+        .driverPackCharacterID = PURA,
         .displayName = "Royal King",
         .shortName = "King",
         .engineClass = TURN,
@@ -78,6 +86,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [PINSTRIPE] = {
         .id = PINSTRIPE,
         .assetName = "pinstripe",
+        .driverPackCharacterID = PINSTRIPE,
         .displayName = "Johnny Thunder",
         .shortName = "J. Thunder",
         .engineClass = BALANCED,
@@ -87,6 +96,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [PAPU_PAPU] = {
         .id = PAPU_PAPU,
         .assetName = "papu",
+        .driverPackCharacterID = PAPU_PAPU,
         .displayName = "King Kahuka",
         .shortName = "Kahuka",
         .engineClass = TURN,
@@ -96,6 +106,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [RIPPER_ROO] = {
         .id = RIPPER_ROO,
         .assetName = "roo",
+        .driverPackCharacterID = RIPPER_ROO,
         .displayName = "Captain Redbeard",
         .shortName = "Redbeard",
         .engineClass = BALANCED,
@@ -105,6 +116,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [KOMODO_JOE] = {
         .id = KOMODO_JOE,
         .assetName = "joe",
+        .driverPackCharacterID = KOMODO_JOE,
         .displayName = "Basil the Batlord",
         .shortName = "Basil",
         .engineClass = SPEED,
@@ -114,6 +126,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [N_TROPY] = {
         .id = N_TROPY,
         .assetName = "ntropy",
+        .driverPackCharacterID = N_TROPY,
         .displayName = "Veronica Voltage",
         .shortName = "Veronica",
         .engineClass = SPEED,
@@ -123,6 +136,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [PENTA_PENGUIN] = {
         .id = PENTA_PENGUIN,
         .assetName = "pen",
+        .driverPackCharacterID = PENTA_PENGUIN,
         .displayName = "Baron Von Barron",
         .shortName = "Barron",
         .engineClass = TURN,
@@ -132,6 +146,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [FAKE_CRASH] = {
         .id = FAKE_CRASH,
         .assetName = "fake",
+        .driverPackCharacterID = FAKE_CRASH,
         .displayName = "Pharaohs Mummy",
         .shortName = "Mummy",
         .engineClass = ACCEL,
@@ -141,6 +156,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [NITROS_OXIDE] = {
         .id = NITROS_OXIDE,
         .assetName = "oxide",
+        .driverPackCharacterID = NITROS_OXIDE,
         .displayName = "Gypsy Moth",
         .shortName = "G. Moth",
         .engineClass = SPEED,
@@ -150,6 +166,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [X_BKNIGHT] = {
         .id = X_BKNIGHT,
         .assetName = "x_bknight",
+        .driverPackCharacterID = CRASH_BANDICOOT,
         .displayName = "Black Knight",
         .shortName = "B. Knight",
         .engineClass = SPEED,
@@ -159,6 +176,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [X_GAIL] = {
         .id = X_GAIL,
         .assetName = "x_gail",
+        .driverPackCharacterID = CRASH_BANDICOOT,
         .displayName = "Gail Storm",
         .shortName = "G. Storm",
         .engineClass = BALANCED,
@@ -168,6 +186,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [X_HAWKINS] = {
         .id = X_HAWKINS,
         .assetName = "x_hawkins",
+        .driverPackCharacterID = CRASH_BANDICOOT,
         .displayName = "Blackjack Hawkins",
         .shortName = "Hawkins",
         .engineClass = TURN,
@@ -177,6 +196,7 @@ static const struct CharacterDef sCharacterRegistry[] =
     [X_ROBO] = {
         .id = X_ROBO,
         .assetName = "x_robo",
+        .driverPackCharacterID = NITROS_OXIDE,
         .displayName = "Robo Racer",
         .shortName = "Robo",
         .engineClass = ACCEL,
@@ -185,6 +205,52 @@ static const struct CharacterDef sCharacterRegistry[] =
     },
 };
 
+int CharacterRegistry_GetEngineClass(
+    int characterID)
+{
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(characterID);
+
+    if (character == NULL)
+        return BALANCED;
+
+    return character->engineClass;
+}
+
+int CharacterRegistry_GetDriverPackID(
+    int characterID)
+{
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(characterID);
+
+    if (character == NULL)
+        return CRASH_BANDICOOT;
+
+    int packID =
+        character->driverPackCharacterID;
+
+    if ((packID < CRASH_BANDICOOT) ||
+        (packID > NITROS_OXIDE))
+    {
+        return CRASH_BANDICOOT;
+    }
+
+    return packID;
+}
+
+b32 CharacterRegistry_HasWheels(
+    int characterID)
+{
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(characterID);
+
+    if (character == NULL)
+        return true;
+
+    return
+        (character->flags &
+         CHARACTER_FLAG_HAS_WHEELS) != 0;
+}
 
 const char *CharacterRegistry_GetAssetName(int characterID)
 {

@@ -1,55 +1,44 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 #if defined(CTR_NATIVE)
-static const char *const sRacerVoiceNames[16] = {
-	"crash",
-	"cortex",
-	"tiny",
-	"coco",
-	"ngin",
-	"dingo",
-	"polar",
-	"pura",
-	"pinstripe",
-	"papu",
-	"roo",
-	"joe",
-	"ntropy",
-	"pen",
-	"fake",
-	"oxide",
-};
 
 static int Voiceline_TryPlayWav(
-	u32 characterID,
-	u32 voiceSetIndex,
-	u32 variantIndex,
-	int *durationTicks)
+    u32 characterID,
+    u32 voiceSetIndex,
+    u32 variantIndex,
+    int *durationTicks)
 {
-	char wavPath[128];
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(
+            (int)characterID);
 
-	if ((characterID >= 16) ||
-	    (voiceSetIndex >= 8) ||
-	    (variantIndex >= 2))
-	{
-		return 0;
-	}
+    if ((character == NULL) ||
+        (voiceSetIndex >= 8) ||
+        (variantIndex >= 2))
+    {
+        return 0;
+    }
 
-	int written = snprintf(
-		wavPath,
-		sizeof(wavPath),
-		"mods/racer_voices/%s/set%02u_%u.wav",
-		sRacerVoiceNames[characterID],
-		(unsigned int)voiceSetIndex,
-		(unsigned int)variantIndex);
+    char wavPath[128];
 
-	if ((written <= 0) ||
-	    ((size_t)written >= sizeof(wavPath)))
-	{
-		return 0;
-	}
+    int written = snprintf(
+        wavPath,
+        sizeof(wavPath),
+        "mods/racer_voices/%s/set%02u_%u.wav",
+        character->assetName,
+        (unsigned int)voiceSetIndex,
+        (unsigned int)variantIndex);
 
-	return CDSYS_XAPlayWav(wavPath, durationTicks);
+    if ((written <= 0) ||
+        ((size_t)written >= sizeof(wavPath)))
+    {
+        return 0;
+    }
+
+    return CDSYS_XAPlayWav(
+        wavPath,
+        durationTicks);
 }
 #endif
 
@@ -192,10 +181,20 @@ void Voiceline_RequestPlay(u32 voiceID, u32 characterID, u32 characterID2)
 		return;
 	}
 
-	if (characterID >= 0x10)
+	const struct CharacterDef *character = CharacterRegistry_GetByID((int)characterID);
+
+	if (character == NULL)
 	{
 		return;
 	}
+
+	/*
+	 * The logical ID selects custom assets.
+	 * The fallback ID safely indexes retail 16-character data.
+	 */
+	u32 fallbackCharacterID =
+		(u32)CharacterRegistry_GetDriverPackID(
+			(int)characterID);
 
 	if (characterID2 >= 0x11)
 	{
@@ -211,7 +210,7 @@ void Voiceline_RequestPlay(u32 voiceID, u32 characterID, u32 characterID2)
 
 	if ((s32)voiceID >= 8)
 	{
-		u32 alreadyPlayed = sdata->timeSet1[characterID] & (1 << (voiceID & 0x1f));
+		u32 alreadyPlayed = sdata->timeSet1[fallbackCharacterID] & (1 << (voiceID & 0x1f));
 		u32 rng = Voiceline_RequestPlay_NextAudioRNG();
 
 		if (alreadyPlayed != 0)
@@ -229,7 +228,7 @@ void Voiceline_RequestPlay(u32 voiceID, u32 characterID, u32 characterID2)
 		}
 	}
 
-	elapsedFrames = (u32)CTR_MipsSubLo(sdata->gGT->frameTimer_MainFrame_ResetDB, sdata->timeSet2[characterID]);
+	elapsedFrames = (u32)CTR_MipsSubLo(sdata->gGT->frameTimer_MainFrame_ResetDB,sdata->timeSet2[fallbackCharacterID]);
 	canImmediate = 0;
 	if (elapsedFrames >= 0x3d)
 	{
@@ -299,7 +298,7 @@ playImmediate:
 			sdata->voicelineCooldown =
 				(s16)durationTicks + 0x1e;
 
-			sdata->timeSet2[characterID] =
+			sdata->timeSet2[fallbackCharacterID] =
 				sdata->gGT->frameTimer_MainFrame_ResetDB;
 
 			return;
@@ -310,14 +309,20 @@ playImmediate:
 	// Original sound-bank fallback.
 	if (voiceType == 0)
 	{
-		OtherFX_Play((characterID + 0x1c) & 0xffff, 2);
+		OtherFX_Play(
+			(fallbackCharacterID + 0x1c) &
+				0xffff,
+			2);
 	}
 	else if (voiceType == 1)
 	{
-		OtherFX_Play((characterID + 0x2c) & 0xffff, 2);
+		OtherFX_Play(
+			(fallbackCharacterID + 0x2c) &
+				0xffff,
+			2);
 	}
 
-	sdata->timeSet2[characterID] = sdata->gGT->frameTimer_MainFrame_ResetDB;
+	sdata->timeSet2[fallbackCharacterID] = sdata->gGT->frameTimer_MainFrame_ResetDB;
 	return;
 
 queueVoiceline:
@@ -326,7 +331,7 @@ queueVoiceline:
 		return;
 	}
 
-	sdata->timeSet1[characterID] |= 1 << (voiceID & 0x1f);
+	sdata->timeSet1[fallbackCharacterID] |= 1 << (voiceID & 0x1f);
 
 	for (struct Item *item = sdata->Voiceline2.first; item != NULL; item = item->next)
 	{
@@ -369,6 +374,7 @@ void Voiceline_StartPlay(struct Item *voiceLine)
 	struct VoicelineItem *voiceLineItem = (struct VoicelineItem *)voiceLine;
 	u32 voiceID = (u16)voiceLineItem->voiceID;
 	u32 characterID = voiceLineItem->characterID;
+	u32 fallbackCharacterID = (u32)CharacterRegistry_GetDriverPackID((int)characterID);
 	u32 voiceSetIndex;
 
 	CTR_WriteU32LE(&sdata->backupParams_FUN_8002cf28[0], CTR_ReadU32LE((u8 *)voiceLineItem + 0x0));
@@ -376,7 +382,7 @@ void Voiceline_StartPlay(struct Item *voiceLine)
 	CTR_WriteU32LE(&sdata->backupParams_FUN_8002cf28[2], CTR_ReadU32LE((u8 *)voiceLineItem + 0x8));
 	CTR_WriteU32LE(&sdata->backupParams_FUN_8002cf28[3], CTR_ReadU32LE((u8 *)voiceLineItem + 0xc));
 
-	if ((IS_BOSS_RACE(sdata->gGT->gameMode1)) && ((u32)(voiceID - 10) < 6) && (((u32)(characterID - 8) < 4) || (characterID == 0xf)))
+	if ((IS_BOSS_RACE(sdata->gGT->gameMode1)) && ((u32)(voiceID - 10) < 6) && (((u32)(fallbackCharacterID  - 8) < 4) || (fallbackCharacterID  == 0xf)))
 	{
 		u32 rng = Voiceline_RequestPlay_NextAudioRNG();
 		voiceSetIndex = (rng & 3) + 4;
@@ -386,8 +392,8 @@ void Voiceline_StartPlay(struct Item *voiceLine)
 		voiceSetIndex = data.voiceID[(s16)voiceID];
 	}
 
-	s16 *voiceIDs = data.voiceData[characterID].voiceSet[voiceSetIndex].ptr;
-	u16 numVoiceIDs = data.voiceData[characterID].voiceSet[voiceSetIndex].num;
+	s16 *voiceIDs = data.voiceData[fallbackCharacterID].voiceSet[voiceSetIndex].ptr;
+	u16 numVoiceIDs = data.voiceData[fallbackCharacterID].voiceSet[voiceSetIndex].num;
 
 	if (numVoiceIDs == 0)
 	{

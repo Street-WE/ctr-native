@@ -113,19 +113,19 @@ void CharacterIconCache_LoadRaceCharacters(
          slot < LOAD_CHARACTER_ID_COUNT;
          slot++)
     {
-        int characterID = data.characterIDs[slot];
+        int characterID =
+            data.characterIDs[slot];
 
         const struct CharacterDef *character =
-            CharacterRegistry_GetByID(characterID);
+            CharacterRegistry_GetByID(
+                characterID);
 
         if (character == NULL)
             continue;
 
-        CharacterIconCache_LoadIntoSlot(
-            slot,
-            character);
-
-        if (!CharacterIconCache_LoadIntoSlot(slot,character))
+        if (!CharacterIconCache_LoadIntoSlot(
+                slot,
+                character))
         {
             continue;
         }

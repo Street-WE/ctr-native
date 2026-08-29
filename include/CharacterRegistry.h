@@ -11,8 +11,9 @@ enum CharacterFlags
 struct CharacterDef
 {
     s16 id;
+    s16 driverPackCharacterID;
 
-    const char *assetName;
+    char assetName[MODEL_NAME_BYTE_COUNT];;
     const char *displayName;
     const char *shortName;
 
@@ -22,6 +23,15 @@ struct CharacterDef
 };
 
 int CharacterRegistry_GetCount(void);
+
+int CharacterRegistry_GetDriverPackID(
+    int characterID);
+
+int CharacterRegistry_GetEngineClass(
+    int characterID);
+
+b32 CharacterRegistry_HasWheels(
+    int characterID);
 
 const struct CharacterDef *
 CharacterRegistry_GetByID(int characterID);

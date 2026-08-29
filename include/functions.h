@@ -855,6 +855,7 @@ void MM_Characters_PreventOverlap(void);
 void MM_Characters_RestoreIDs(void);
 void MM_Characters_HideDrivers(void);
 void MM_Characters_MenuProc(struct RectMenu *unused);
+void MM_Characters_ReloadPageIcons(void);
 void MM_TrackSelect_Video_SetDefaults(void);
 void MM_TrackSelect_Video_State(b32 resetPreview);
 void MM_TrackSelect_Video_Draw(RECT *r, struct MainMenu_LevelRow *selectMenu, int trackIndex, int stopVideo, u16 rectFlags);
