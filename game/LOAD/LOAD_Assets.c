@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 #if defined(CTR_NATIVE) && defined(CTR_INTERNAL)
 #include <platform/native_checkpoint.h>
@@ -164,62 +165,111 @@ void LOAD_RunPtrMap(char *origin, int *patchArr, int numPtrs)
 		return 1;
 	}
 
-	void LOAD_ApplyLooseRacerIcons(struct GameTracker *gGT)
+	static b32 LOAD_ApplyLooseRacerIcon(
+    struct Icon *icon,
+    const char *assetName)
 	{
-		for (int characterID = 0;
-			 characterID < LOOSE_RACER_ICON_COUNT;
+		char path[128];
+		u16 packedPixels[
+			LOOSE_ICON_WORDS_PER_ROW *
+			LOOSE_ICON_HEIGHT];
+		u16 clut[16];
+
+		if (icon == NULL || assetName == NULL)
+			return false;
+
+		snprintf(
+			path,
+			sizeof(path),
+			"mods/racer_icons/%s.png",
+			assetName);
+
+		if (!LOAD_ReadLooseRacerIcon(
+				path,
+				packedPixels,
+				clut))
+		{
+			return false;
+		}
+
+		struct TextureLayout *layout =
+			&icon->texLayout;
+
+		int pageX =
+			(layout->tpage & 0x0f) << 6;
+
+		int pageY =
+			(layout->tpage & 0x10) ? 256 : 0;
+
+		int textureX =
+			pageX + layout->u0 / 4;
+
+		int textureY =
+			pageY + layout->v0;
+
+		int clutX =
+			(layout->clut & 0x3f) << 4;
+
+		int clutY =
+			layout->clut >> 6;
+
+		RECT16 textureRect = {
+			textureX,
+			textureY,
+			LOOSE_ICON_WORDS_PER_ROW,
+			LOOSE_ICON_HEIGHT,
+		};
+
+		RECT16 clutRect = {
+			clutX,
+			clutY,
+			16,
+			1,
+		};
+
+		LoadImage(&textureRect, packedPixels);
+		LoadImage(&clutRect, clut);
+
+		return true;
+	}
+
+	void LOAD_ApplyLooseRacerIcons(
+		struct GameTracker *gGT)
+	{
+		if (gGT == NULL)
+			return;
+
+		/*
+		 * Restore the original sixteen icons to their normal physical
+		 * locations whenever the level icon data is loaded.
+		 */
+		for (int characterID = CRASH_BANDICOOT;
+			 characterID <= NITROS_OXIDE;
 			 characterID++)
 		{
-			struct Icon *icon;
-			u16 packedPixels[LOOSE_ICON_WORDS_PER_ROW * LOOSE_ICON_HEIGHT];
-			u16 clut[16];
+			const struct CharacterDef *character =
+				CharacterRegistry_GetByID(characterID);
 
-			if (!LOAD_ReadLooseRacerIcon(
-					sLooseRacerIconPaths[characterID],
-					packedPixels,
-					clut))
-			{
+			if (character == NULL)
 				continue;
-			}
 
-			icon = gGT->ptrIcons[
-				data.MetaDataCharacters[characterID].iconID
-			];
+			int iconID =
+				data.MetaDataCharacters[characterID].iconID;
+
+			if ((u32)iconID >= len(gGT->ptrIcons))
+				continue;
+
+			struct Icon *icon =
+				gGT->ptrIcons[iconID];
 
 			if (icon == NULL)
-			{
 				continue;
-			}
 
-			struct TextureLayout *layout = &icon->texLayout;
-
-			int pageX = (layout->tpage & 0x0f) << 6;
-			int pageY = (layout->tpage & 0x10) ? 256 : 0;
-
-			int textureX = pageX + (layout->u0 / 4);
-			int textureY = pageY + layout->v0;
-
-			int clutX = (layout->clut & 0x3f) << 4;
-			int clutY = layout->clut >> 6;
-
-			RECT16 textureRect = {
-				textureX,
-				textureY,
-				LOOSE_ICON_WORDS_PER_ROW,
-				LOOSE_ICON_HEIGHT,
-			};
-
-			RECT16 clutRect = {
-				clutX,
-				clutY,
-				16,
-				1,
-			};
-
-			LoadImage(&textureRect, packedPixels);
-			LoadImage(&clutRect, clut);
+			LOAD_ApplyLooseRacerIcon(
+				icon,
+				character->assetName);
 		}
-}
+	}
 #endif
 
 enum

@@ -1,4 +1,6 @@
 #include <common.h>
+#include <CharacterRegistry.h>
+#include <CharacterIconCache.h>
 
 enum
 {
@@ -67,11 +69,9 @@ enum
     MM_CHARACTER_SELECT_PAGE_HINT_BUFFER_SIZE = 32,
 };
 
-//Later will update MM_CHARACTER_ROSTER_COUNT to read from a mod character registry
 enum
 {
     MM_CHARACTER_PAGE_SIZE = 8,
-    MM_CHARACTER_ROSTER_COUNT = NITROS_OXIDE + 1,
 };
 
 static s16 s_characterPage;
@@ -79,7 +79,7 @@ static s16 s_characterCursor;
 
 static int MM_Characters_GetPageCount(void)
 {
-    return (MM_CHARACTER_ROSTER_COUNT +
+    return (CharacterRegistry_GetCount() +
             MM_CHARACTER_PAGE_SIZE - 1) /
            MM_CHARACTER_PAGE_SIZE;
 }
@@ -87,7 +87,7 @@ static int MM_Characters_GetPageCount(void)
 static int MM_Characters_GetPageCharacterCount(int page)
 {
     int remaining =
-        MM_CHARACTER_ROSTER_COUNT -
+        CharacterRegistry_GetCount() -
         page * MM_CHARACTER_PAGE_SIZE;
 
     if (remaining <= 0)
@@ -101,8 +101,16 @@ static int MM_Characters_GetPageCharacterCount(int page)
 
 static int MM_Characters_GetHighlightedID(void)
 {
-    return s_characterPage * MM_CHARACTER_PAGE_SIZE +
-           s_characterCursor;
+    int rosterIndex =
+    s_characterPage * MM_CHARACTER_PAGE_SIZE +
+    s_characterCursor;
+
+	const struct CharacterDef *character =
+		CharacterRegistry_GetByRosterIndex(rosterIndex);
+
+	return character != NULL
+		? character->id
+		: CRASH_BANDICOOT;
 }
 
 static void MM_Characters_DrawPageHint(void)
@@ -422,7 +430,7 @@ void MM_Characters_DrawWindows(b32 boolShowDrivers)
 		driverInst->animFrame = 0;
 		driverInst->animIndex = 0;
 
-		struct Model *model = MM_Characters_GetModelByName(data.MetaDataCharacters[(int)*currCharacterID].name_Debug);
+		struct Model *model = MM_Characters_GetModelByName(CharacterRegistry_GetAssetName(*currCharacterID));
 
 		// set modelPtr in Instance
 		driverInst->model = model;
@@ -614,7 +622,7 @@ void MM_Characters_RestoreIDs(void)
 	int characterID = data.characterIDs[0];
 
 	if ((characterID < 0) ||
-		(characterID >= MM_CHARACTER_ROSTER_COUNT))
+		(characterID >= CharacterRegistry_GetCount()))
 	{
 		characterID = CRASH_BANDICOOT;
 	}
@@ -628,6 +636,10 @@ void MM_Characters_RestoreIDs(void)
 	data.characterIDs[0] = characterID;
 
 	MM_Characters_SetMenuLayout();
+
+	CharacterIconCache_LoadRosterPage(
+    gGT,
+    s_characterPage);
 
 	for (s32 playerIndex = 0; playerIndex < gGT->numPlyrNextGame; playerIndex++)
 	{
@@ -654,6 +666,8 @@ static void MM_Characters_ChangePage(int direction)
     s_characterPage =
         (s_characterPage + direction + pageCount) %
         pageCount;
+
+	CharacterIconCache_LoadRosterPage(sdata->gGT,s_characterPage);
 
     int count =
         MM_Characters_GetPageCharacterCount(
@@ -939,7 +953,7 @@ dontDrawSelectCharacter:
 			s_characterPage * MM_CHARACTER_PAGE_SIZE +
 			slot;
 
-		if (characterID >= MM_CHARACTER_ROSTER_COUNT)
+		if (characterID >= CharacterRegistry_GetCount())
 			continue;
 
 		struct CharacterSelectMeta *visualSlot =
@@ -948,10 +962,10 @@ dontDrawSelectCharacter:
 		struct TransitionMeta *transition =
 			&D230.characterSelectTransitionMeta[slot];
 
-		struct Icon *icon =
-			gGT->ptrIcons[
-				data.MetaDataCharacters[characterID].iconID
-			];
+		struct Icon *icon = CharacterIconCache_Get(characterID);
+
+		if (icon == NULL)
+			continue;
 
 		Color iconColor = D230.characterSelect_NeutralColor;
 
@@ -1044,13 +1058,24 @@ dontDrawSelectCharacter:
 			}
 
 			// draw string
-			int characterID = MM_Characters_GetHighlightedID();
+			int characterID =
+				MM_Characters_GetHighlightedID();
 
-			DecalFont_DrawLine(
-				sdata->lngStrings[
-					data.MetaDataCharacters[characterID].name_LNG_long],
-			                   (int)driverWindowTransition->currX + windowPos->x + (int)((u32)D230.characterSelectWindowWidth >> 1), (int)nameY, fontType,
-			                   (JUSTIFY_CENTER | ORANGE));
+			const struct CharacterDef *character =
+				CharacterRegistry_GetByID(characterID);
+
+			if (character != NULL)
+			{
+				DecalFont_DrawLine(
+					(char *)character->displayName,
+					(int)driverWindowTransition->currX +
+						windowPos->x +
+						(int)((u32)
+							D230.characterSelectWindowWidth >> 1),
+					(int)nameY,
+					fontType,
+					JUSTIFY_CENTER | ORANGE);
+			}
 		}
 
 		// spin the character
@@ -1061,21 +1086,34 @@ dontDrawSelectCharacter:
 	activeCharacterSelectMeta = D230.activeCharacterSelectMeta;
 
 	// loop through all icons
-	for (s32 slot = 0;
+	for (int slot = 0;
 		 slot < MM_CHARACTER_PAGE_SIZE;
 		 slot++)
 	{
-		int characterID =
-			s_characterPage * MM_CHARACTER_PAGE_SIZE + slot;
+		int rosterIndex =
+			s_characterPage * MM_CHARACTER_PAGE_SIZE +
+			slot;
 
-		if (characterID >= MM_CHARACTER_ROSTER_COUNT)
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByRosterIndex(
+				rosterIndex);
+
+		if (character == NULL)
 			continue;
+
+		int characterID = character->id;
 
 		struct CharacterSelectMeta *visualSlot =
 			&D230.characterSelectMeta1P2P[slot];
 
 		struct TransitionMeta *transition =
 			&D230.characterSelectTransitionMeta[slot];
+
+		struct Icon *icon =
+			CharacterIconCache_Get(characterID);
+
+		if (icon == NULL)
+			continue;
 
 		drawRect.x = transition->currX + visualSlot->posX;
 		drawRect.y = transition->currY + visualSlot->posY;

@@ -105,6 +105,8 @@
 #include "LOAD/LOAD_File.c"
 #include "LOAD/LOAD_Howl.c"
 #include "LOAD/LOAD_Assets.c"
+#include "CharacterRegistry.c"
+#include "CharacterIconCache.c"
 #include "LOAD/LOAD_Queue.c"
 #include "LOAD/LOAD_Hub.c"
 #include "LOAD/LOAD_Overlays.c"
