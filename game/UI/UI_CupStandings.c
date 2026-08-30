@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterIconCache.h>
 
 enum
 {
@@ -419,12 +420,28 @@ void UI_CupStandings_InputAndDraw(void)
 		}
 
 		// Draw character icon
-		UI_DrawDriverIcon(gGT->ptrIcons[data.MetaDataCharacters[data.characterIDs[d->driverID]].iconID],
+		int characterID =
+			data.characterIDs[d->driverID];
 
-		                  drawPos.x, drawPos.y, &gGT->backBuffer->primMem,
+		// Get its currently loaded physical icon slot
+		struct Icon *icon =	CharacterIconCache_Get(characterID);
 
-		                  gGT->pushBuffer_UI.ptrOT, TRANS_50_DECAL, UI_CUP_STANDINGS_ICON_SCALE,
-		                  MakeColorPacked(UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL, UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL, UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL));
+		// Draw the icon only if it exists in the race cache
+		if (icon != NULL)
+		{
+			UI_DrawDriverIcon(
+				icon,
+				drawPos.x,
+				drawPos.y,
+				&gGT->backBuffer->primMem,
+				gGT->pushBuffer_UI.ptrOT,
+				TRANS_50_DECAL,
+				UI_CUP_STANDINGS_ICON_SCALE,
+				MakeColorPacked(
+					UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL,
+					UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL,
+					UI_CUP_STANDINGS_ICON_NEUTRAL_CHANNEL));
+		}
 
 		// If this is the first screen of cup standings,
 		// where you see just amount of points added
