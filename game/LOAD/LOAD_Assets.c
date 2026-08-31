@@ -1,9 +1,158 @@
 #include <common.h>
 #include <CharacterRegistry.h>
+#include <LevelRegistry.h>
 
 #if defined(CTR_NATIVE) && defined(CTR_INTERNAL)
 #include <platform/native_checkpoint.h>
 #endif
+
+static const u8 sTrackRosters[NITRO_COURT][LOAD_CHARACTER_ID_COUNT] =
+{
+	[CRASH_COVE] = {
+		KOMODO_JOE,
+		COCO_BANDICOOT,
+		X_HAWKINS,
+		TINY_TIGER,
+		X_ALPHA,
+		X_BKNIGHT,
+		X_GAIL,
+		N_TROPY,
+	},
+
+	[ROO_TUBES] = {
+		KOMODO_JOE,
+		COCO_BANDICOOT,
+		X_HAWKINS,
+		TINY_TIGER,
+		X_ALPHA,
+		X_BKNIGHT,
+		X_GAIL,
+		N_TROPY,
+	},
+
+	[TIGER_TEMPLE] = {
+		KOMODO_JOE,
+		COCO_BANDICOOT,
+		X_HAWKINS,
+		TINY_TIGER,
+		X_ALPHA,
+		X_BKNIGHT,
+		X_GAIL,
+		N_TROPY,
+	},
+
+	[CORTEX_CASTLE] = {
+		KOMODO_JOE,
+		COCO_BANDICOOT,
+		X_HAWKINS,
+		TINY_TIGER,
+		X_ALPHA,
+		X_BKNIGHT,
+		X_GAIL,
+		N_TROPY,
+	},
+
+	[OXIDE_STATION] = {
+		PAPU_PAPU,
+		X_ACHU,
+		DINGODILE,
+		X_ISLANDER,
+		PURA,
+		X_NOVA,
+		X_ADMIRAL,
+		N_TROPY,
+	},
+
+	[COCO_PARK] = {
+		PAPU_PAPU,
+		X_ACHU,
+		DINGODILE,
+		X_ISLANDER,
+		PURA,
+		X_NOVA,
+		X_ADMIRAL,
+		N_TROPY,
+	},
+
+	[DRAGON_MINES] = {
+		PAPU_PAPU,
+		X_ACHU,
+		DINGODILE,
+		X_ISLANDER,
+		PURA,
+		X_NOVA,
+		X_ADMIRAL,
+		N_TROPY,
+	},
+
+	[PAPU_PYRAMID] = {
+		PAPU_PAPU,
+		X_ACHU,
+		DINGODILE,
+		X_ISLANDER,
+		PURA,
+		X_NOVA,
+		X_ADMIRAL,
+		N_TROPY,
+	},
+
+	[MYSTERY_CAVES] = {
+		RIPPER_ROO,
+		POLAR,
+		N_GIN,
+		CRASH_BANDICOOT,
+		FAKE_CRASH,
+		X_NOVA,
+		X_BKNIGHT,
+		N_TROPY,
+	},
+
+	[N_GIN_LABS] = {
+		RIPPER_ROO,
+		POLAR,
+		N_GIN,
+		CRASH_BANDICOOT,
+		FAKE_CRASH,
+		X_NOVA,
+		X_BKNIGHT,
+		N_TROPY,
+	},
+
+	[SEWER_SPEEDWAY] = {
+		RIPPER_ROO,
+		POLAR,
+		N_GIN,
+		CRASH_BANDICOOT,
+		FAKE_CRASH,
+		X_NOVA,
+		X_BKNIGHT,
+		N_TROPY,
+	},
+
+	[DINGO_CANYON] = {
+		RIPPER_ROO,
+		POLAR,
+		N_GIN,
+		CRASH_BANDICOOT,
+		FAKE_CRASH,
+		X_NOVA,
+		X_BKNIGHT,
+		N_TROPY,
+	},
+
+	[HOT_AIR_SKYWAY] = {
+		NEO_CORTEX,
+		NITROS_OXIDE,
+		PENTA_PENGUIN,
+		PINSTRIPE,
+		KOMODO_JOE,
+		PAPU_PAPU,
+		RIPPER_ROO,
+		N_TROPY,
+	},
+
+	/* One eight-character entry for every race track. */
+};
 
 void LOAD_RunPtrMap(char *origin, int *patchArr, int numPtrs)
 {
@@ -509,22 +658,41 @@ void LOAD_Robots2P(struct BigHeader *bigfile, int p1, int p2, void (*callback)(s
 	LOAD_LoadLooseRacerModels(6);
 }
 
-void LOAD_Robots1P(int characterID)
+void LOAD_Robots1P(int characterID, int levelID)
 {
-	int newCharacterID = 0;
+	const u8 *trackRoster = sTrackRosters[levelID];
+	const int *customRoster = NULL;
+	int customRosterCount = 0;
+	int outputSlot = 1;
+
+#if defined(CTR_NATIVE)
+	customRoster = LevelRegistry_GetRacers(levelID, &customRosterCount);
+#endif
 
 	data.characterIDs[0] = characterID;
 
-	for (int i = 1; i < LOAD_CHARACTER_ID_COUNT; i++, newCharacterID++)
-	{
-		if (newCharacterID == characterID)
-		{
-			newCharacterID++;
-		}
+	 for (int rosterSlot = 0;
+         rosterSlot < LOAD_CHARACTER_ID_COUNT &&
+         outputSlot < LOAD_CHARACTER_ID_COUNT;
+         rosterSlot++)
+    {
+		int rosterCharacter = customRosterCount == LOAD_CHARACTER_ID_COUNT ?
+			customRoster[rosterSlot] : trackRoster[rosterSlot];
 
-		data.characterIDs[i] = newCharacterID;
-	}
-	LOAD_LoadLooseRacerModels(LOAD_CHARACTER_ID_COUNT);
+        if (rosterCharacter == characterID)
+        {
+            continue;
+        }
+
+        data.characterIDs[outputSlot] = rosterCharacter;
+        outputSlot++;
+    }
+
+    /*
+     * The player wasn't in the track roster, so only seven entries
+     * were copied. The roster's eighth entry is consequently omitted.
+     */
+    LOAD_LoadLooseRacerModels(LOAD_CHARACTER_ID_COUNT);
 }
 
 static void (*const LOAD_DriverMPK_SetPointer)(struct LoadQueueSlot *) = LOAD_QUEUE_CALLBACK_SET_POINTER;
@@ -600,7 +768,7 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 		}
 		else if ((gameMode1 & (TIME_TRIAL | MAIN_MENU)) != MAIN_MENU)
 		{
-			LOAD_Robots1P(data.characterIDs[0]);
+			LOAD_Robots1P(data.characterIDs[0],gGT->levelID);
 		}
 
 		// arcade mpk

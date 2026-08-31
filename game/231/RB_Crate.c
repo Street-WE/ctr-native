@@ -237,6 +237,10 @@ int RB_CrateWeapon_ThCollide(struct Thread *crateThread, struct Thread *collidin
 			{
 				return 1;
 			}
+			if (RB_Warpball_IsDriverRiding(driver))
+			{
+				return 0;
+			}
 			if ((driver->actionsFlagSet & ACTION_BOT) != 0)
 			{
 				return 1;
@@ -355,13 +359,17 @@ int RB_CrateFruit_ThCollide(struct Thread *crateThread, struct Thread *colliding
 
 		if (crateInst->scale.x == 0x1000)
 		{
-			RB_CrateAny_ExplodeInit(crateInst, 0xf2953a0, false);
-
 			driver = RB_CrateAny_GetDriver(collidingTh, sps);
 			if ((int)driver == 1)
 			{
 				return 1;
 			}
+			if (RB_Warpball_IsDriverRiding(driver))
+			{
+				return 0;
+			}
+
+			RB_CrateAny_ExplodeInit(crateInst, 0xf2953a0, false);
 
 			random = MixRNG_Scramble();
 			newWumpa = random;

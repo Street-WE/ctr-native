@@ -408,11 +408,12 @@ void Voiceline_StartPlay(struct Item *voiceLine)
 	#if defined(CTR_NATIVE)
 		{
 			int durationTicks = 0;
+			u32 wavVariantIndex = rng & 1;
 
 			if (Voiceline_TryPlayWav(
 					characterID,
 					voiceSetIndex,
-					voiceIndex,
+					wavVariantIndex,
 					&durationTicks))
 			{
 				sdata->voicelineCooldown =

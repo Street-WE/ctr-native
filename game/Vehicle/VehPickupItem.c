@@ -444,6 +444,11 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 	int mineHitModel = 0;
 	int mineShouldInitFollower = 0;
 
+	if (RB_Warpball_IsDriverRiding(d))
+	{
+		return;
+	}
+
 	switch (weaponID)
 	{
 	// Turbo
@@ -1065,6 +1070,7 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 
 		tw->vel.y = 0;
 		tw->rotY = d->angle;
+		tw->dir.y = d->angle;
 		tw->parentSafetyFrames = WARPBALL_PARENT_SAFETY_FRAMES;
 
 		// do NOT patch for 60fps,
@@ -1123,6 +1129,11 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 void VehPickupItem_ShootOnCirclePress(struct Driver *d)
 {
 	u8 weapon;
+
+	if (RB_Warpball_IsDriverRiding(d))
+	{
+		return;
+	}
 
 	if (d->pendingDamageType != 0)
 	{

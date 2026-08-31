@@ -36,6 +36,9 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 			howl_StopAudio(0, 0, 1);
 			howl_UnPauseAudio();
 			sdata->boolSoundPaused = 0;
+			#ifdef CTR_NATIVE
+				NativeAudio_ResumeMusic();
+			#endif
 		}
 	}
 	else if (sdata->boolSoundPaused == 0)
@@ -43,6 +46,9 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 		OtherFX_Stop2(1);
 		howl_PauseAudio();
 		sdata->boolSoundPaused = 1;
+		#ifdef CTR_NATIVE
+			NativeAudio_PauseMusic();
+		#endif
 	}
 	return;
 }

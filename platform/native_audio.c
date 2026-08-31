@@ -226,6 +226,17 @@ struct NativeAudioXA
 	s16 volumeRight;
 };
 
+struct NativeAudioMusic
+{
+	s16 *pcm;
+	int frameCount;
+	int currentFrame;
+	s16 volumeLeft;
+	s16 volumeRight;
+	b32 active;
+	b32 paused;
+};
+
 enum NativeAudioXaSourceKind
 {
 	NATIVE_AUDIO_XA_SOURCE_NONE,
@@ -291,6 +302,7 @@ struct NativeAudioState
 	struct NativeAudioXA xa;
 	struct NativeAudioXaStream xaStream;
 	struct NativeAudioOutput output;
+	struct NativeAudioMusic music;
 };
 
 struct NativeAudioByteBuffer
@@ -1475,6 +1487,12 @@ internal int NativeAudio_VoiceStreamAdvanceBlock(struct NativeAudioVoice *voice)
 
 	NativeAudio_DecodeVoiceBlock(stream);
 	return !ended;
+}
+
+internal void NativeAudio_CloseMusicNoLock(void)
+{
+	SDL_free(s_audio.music.pcm);
+	memset(&s_audio.music, 0, sizeof(s_audio.music));
 }
 
 internal void NativeAudio_CloseXANoLock(void)
@@ -2713,6 +2731,57 @@ internal void NativeAudio_MixFrame(s16 *outLeft, s16 *outRight)
 		}
 	}
 
+	if (s_audio.music.active && !s_audio.music.paused && (s_audio.music.pcm != NULL) && (s_audio.music.frameCount > 0))
+	{
+		int frame = s_audio.music.currentFrame;
+
+		/*
+		 * Recover safely if the position becomes invalid after a state
+		 * transition or future snapshot change.
+		 */
+		if ((frame < 0) || (frame >= s_audio.music.frameCount))
+		{
+			frame = 0;
+		}
+
+		if (!s_audio.muted)
+		{
+			int srcLeft =
+				s_audio.music.pcm[
+					frame * NATIVE_AUDIO_CHANNELS];
+
+			int srcRight =
+				s_audio.music.pcm[
+					frame * NATIVE_AUDIO_CHANNELS + 1];
+
+			int left = NativeAudio_ApplyVolume(
+				srcLeft,
+				s_audio.music.volumeLeft,
+				s_audio.masterVolumeLeft);
+
+			int right = NativeAudio_ApplyVolume(
+				srcRight,
+				s_audio.music.volumeRight,
+				s_audio.masterVolumeRight);
+
+			NativeAudio_MixSample(
+				&mixLeft,
+				&mixRight,
+				left,
+				right);
+		}
+
+		frame++;
+
+		/* Whole-file looping. */
+		if (frame >= s_audio.music.frameCount)
+		{
+			frame = 0;
+		}
+
+		s_audio.music.currentFrame = frame;
+	}
+
 	if (!s_audio.muted)
 	{
 		for (i = 0; i < NATIVE_AUDIO_SPU_VOICE_COUNT; i++)
@@ -2936,6 +3005,7 @@ void NativeAudio_Shutdown(void)
 		s_audio.output.device = 0;
 	}
 
+	NativeAudio_CloseMusicNoLock();
 	NativeAudio_CloseXANoLock();
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
@@ -3432,6 +3502,129 @@ int NativeAudio_PlayXAFile(const char *relativePath, int channelFilter, int volu
 	NativeAudio_XaPreparedStreamClose(&prepared);
 
 	return 1;
+}
+
+int NativeAudio_PlayMusicWav(
+	const char *relativePath,
+	int volumeLeft,
+	int volumeRight)
+{
+	char hostPath[NATIVE_ASSETS_PATH_MAX];
+	SDL_AudioSpec sourceSpec;
+	SDL_AudioSpec targetSpec;
+	Uint8 *sourceData = NULL;
+	Uint8 *convertedData = NULL;
+	Uint32 sourceLength = 0;
+	int convertedLength = 0;
+	int frameCount;
+
+	if (!NativeAudio_SpuInit())
+	{
+		return 0;
+	}
+
+	if ((relativePath == NULL) ||
+	    !NativeAssets_ResolvePath(
+		    relativePath,
+		    hostPath,
+		    sizeof(hostPath)))
+	{
+		return 0;
+	}
+
+	memset(&sourceSpec, 0, sizeof(sourceSpec));
+	if (!SDL_LoadWAV(
+		    hostPath,
+		    &sourceSpec,
+		    &sourceData,
+		    &sourceLength))
+	{
+		return 0;
+	}
+
+	targetSpec.format = SDL_AUDIO_S16LE;
+	targetSpec.channels = NATIVE_AUDIO_CHANNELS;
+	targetSpec.freq = NATIVE_AUDIO_SAMPLE_RATE;
+
+	if ((sourceLength > INT_MAX) ||
+	    !SDL_ConvertAudioSamples(
+		    &sourceSpec,
+		    sourceData,
+		    (int)sourceLength,
+		    &targetSpec,
+		    &convertedData,
+		    &convertedLength))
+	{
+		SDL_free(sourceData);
+		return 0;
+	}
+
+	SDL_free(sourceData);
+
+	if ((convertedLength <= 0) ||
+	    ((convertedLength %
+	      (NATIVE_AUDIO_CHANNELS * (int)sizeof(s16))) != 0))
+	{
+		SDL_free(convertedData);
+		return 0;
+	}
+
+	frameCount = convertedLength /
+		(NATIVE_AUDIO_CHANNELS * (int)sizeof(s16));
+
+	NativeAudio_LockOutput();
+
+	NativeAudio_CloseMusicNoLock();
+	s_audio.music.pcm = (s16 *)convertedData;
+	s_audio.music.frameCount = frameCount;
+	s_audio.music.currentFrame = 0;
+	s_audio.music.volumeLeft = (s16)volumeLeft;
+	s_audio.music.volumeRight = (s16)volumeRight;
+	s_audio.music.active = 1;
+	s_audio.music.paused = 0;
+
+	NativeAudio_UnlockOutput();
+
+	return 1;
+}
+
+void NativeAudio_StopMusic(void)
+{
+	NativeAudio_LockOutput();
+	NativeAudio_CloseMusicNoLock();
+	NativeAudio_UnlockOutput();
+}
+
+void NativeAudio_PauseMusic(void)
+{
+	NativeAudio_LockOutput();
+	s_audio.music.paused = 1;
+	NativeAudio_UnlockOutput();
+}
+
+void NativeAudio_ResumeMusic(void)
+{
+	NativeAudio_LockOutput();
+	if (s_audio.music.active)
+		s_audio.music.paused = 0;
+	NativeAudio_UnlockOutput();
+}
+
+void NativeAudio_SetMusicVolume(int volumeLeft, int volumeRight)
+{
+	NativeAudio_LockOutput();
+	s_audio.music.volumeLeft = (s16)volumeLeft;
+	s_audio.music.volumeRight = (s16)volumeRight;
+	NativeAudio_UnlockOutput();
+}
+
+int NativeAudio_IsMusicPlaying(void)
+{
+	int playing;
+	NativeAudio_LockOutput();
+	playing = s_audio.music.active && !s_audio.music.paused;
+	NativeAudio_UnlockOutput();
+	return playing;
 }
 
 int NativeAudio_PlayWavFile(

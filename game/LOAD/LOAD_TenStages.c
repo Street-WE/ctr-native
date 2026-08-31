@@ -30,6 +30,53 @@ static void LOAD_NativeAudio_SetStateAfterBankReload(u32 state)
 }
 #endif
 
+#ifdef CTR_NATIVE
+#include <LevelRegistry.h>
+#include <platform/native_audio.h>
+
+static void LOAD_NativeMusic_StartForLevel(
+	struct GameTracker *gGT)
+{
+	const char *musicPath;
+	int volume;
+
+	NativeAudio_StopMusic();
+
+	if (gGT == NULL)
+	{
+		return;
+	}
+
+	musicPath =
+		LevelRegistry_GetMusic(gGT->levelID);
+
+	if (musicPath == NULL)
+	{
+		/* Keep the normal HOWL/CSEQ music. */
+		return;
+	}
+
+	/*
+	 * Prevent the original level song from playing underneath
+	 * the custom WAV.
+	 */
+	CseqMusic_StopAll();
+	Music_End();
+
+	/*
+	 * Native direct-volume values use the same shift as XA.
+	 */
+	volume =
+		sdata->vol_Music <<
+		CDSYS_XA_VOLUME_SHIFT;
+
+	NativeAudio_PlayMusicWav(
+		musicPath,
+		volume,
+		volume);
+}
+#endif
+
 int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *bigfile)
 {
 	int levelID;
@@ -51,6 +98,10 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 	{
 	case 0:
 	{
+		#ifdef CTR_NATIVE
+		NativeAudio_StopMusic();
+		#endif
+
 		if (!boolPlayMusicDuringLoading)
 		{
 			Cutscene_VolumeBackup();
@@ -646,6 +697,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		LAB_800346b0:
 #if defined(CTR_NATIVE)
 			LOAD_NativeAudio_SetStateAfterBankReload(audioState);
+			LOAD_NativeMusic_StartForLevel(gGT);
 #else
 			Audio_SetState_Safe(audioState);
 #endif

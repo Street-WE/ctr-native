@@ -1016,6 +1016,9 @@ void RB_Warpball_Start(struct TrackerWeapon *tw);
 void RB_Warpball_SeekDriver(struct TrackerWeapon *tw, u32 checkpointIndex, struct Driver *d);
 void RB_Warpball_ThTick(struct Thread *t);
 void RB_Warpball_TurnAround(struct Thread *t);
+void RB_Warpball_ResetRideState(void);
+b32 RB_Warpball_IsDriverRiding(const struct Driver *d);
+void RB_Warpball_SetDriverRiding(struct Driver *d, b32 active);
 void WarpTurbo_ResyncBotNav(struct Driver *bot);
 
 void RB_Player_ToggleInvisible(void);
@@ -1225,7 +1228,7 @@ int DecalFont_GetLineWidthStrlen(char *character, int len, int fontType);
 void RB_Burst_Init(struct Instance *weaponInst);
 void GAMEPAD_ShockFreq(struct Driver *d, int frame, int val);
 b32 RaceFlag_IsTransitioning(void);
-void LOAD_Robots1P(int characterID);
+void LOAD_Robots1P(int characterID, int levelID);
 void UI_Map_DrawRawIcon(struct UIMap *map, const s32 worldPos[3], int iconID, int colorID, int unused, s16 scale);
 s16 RaceFlag_GetCanDraw(void);
 void UI_Map_DrawDrivers(struct UIMap *map, struct Thread *bucket, s16 *driverIconCounter);

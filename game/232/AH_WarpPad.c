@@ -488,7 +488,7 @@ void AH_WarpPad_ThTick(struct Thread *t)
 
 	// Retail repeats this setup every close/warping frame before the
 	// transition/load gate.
-	LOAD_Robots1P(data.characterIDs[0]);
+	LOAD_Robots1P(data.characterIDs[0],gGT->levelID);
 
 	// variable reuse, get track speed champion
 	champID = data.metaDataLEV[levelID].characterID_Champion;

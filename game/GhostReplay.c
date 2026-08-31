@@ -336,6 +336,7 @@ void GhostReplay_Init1(void)
 	}
 
 	struct GhostHeader *gh = MEMPACK_AllocMem(0x3e00);
+	memset(gh, 0, 0x3e00);
 	char *recordBuffer = GHOSTHEADER_GETRECORDBUFFER(gh);
 	sdata->GhostRecording.ptrGhost = gh;
 	sdata->GhostRecording.ptrStartOffset = &recordBuffer[0];
@@ -356,9 +357,29 @@ void GhostReplay_Init1(void)
 		else
 		{
 			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
-			void **pointers = ST1_GETPOINTERS(gGT->level1->ptrSpawnType1);
+			struct SpawnType1 *spawnType1 = gGT->level1->ptrSpawnType1;
+			gh = NULL;
 
-			gh = ((timeTrialFlags & TT_NTROPY_BEATEN) != 0) ? pointers[ST1_NOXIDE] : pointers[ST1_NTROPY];
+			if (spawnType1 != NULL)
+			{
+				int ghostIndex =
+					((timeTrialFlags & TT_NTROPY_BEATEN) != 0)
+						? ST1_NOXIDE
+						: ST1_NTROPY;
+
+				if (spawnType1->count > ghostIndex)
+				{
+					void **pointers = ST1_GETPOINTERS(spawnType1);
+					gh = pointers[ghostIndex];
+				}
+			}
+		}
+
+		if (gh == NULL)
+		{
+			gh = MEMPACK_AllocMem(sizeof(struct GhostHeader));
+			memset(gh, 0, sizeof(struct GhostHeader));
+
 		}
 
 		recordBuffer = GHOSTHEADER_GETRECORDBUFFER(gh);

@@ -47,4 +47,18 @@ int NativeAudio_PlayWavFile(
 	int volumeRight,
 	int *durationTicks);
 
+int NativeAudio_PlayMusicWav(
+	const char *relativePath,
+	int volumeLeft,
+	int volumeRight);
+
+void NativeAudio_StopMusic(void);
+void NativeAudio_PauseMusic(void);
+void NativeAudio_ResumeMusic(void);
+void NativeAudio_SetMusicVolume(
+	int volumeLeft,
+	int volumeRight);
+
+int NativeAudio_IsMusicPlaying(void);
+
 #endif

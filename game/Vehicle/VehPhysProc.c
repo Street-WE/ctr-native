@@ -507,9 +507,8 @@ void VehPhysProc_Driving_PhysLinear(struct Thread *thread, struct Driver *driver
 	while (driverItemThread != 0)
 	{
 		// If thread->modelIndex is Aku or Uka
-		if ((driverItemThread->modelIndex == STATIC_UKAUKA) || (driverItemThread->modelIndex == STATIC_AKUAKU))
+		if (!RB_Warpball_IsDriverRiding(driver) && ((driverItemThread->modelIndex == STATIC_UKAUKA) || (driverItemThread->modelIndex == STATIC_AKUAKU)))
 		{
-			// driver is using mask weapon
 			actionsFlagSetCopy = actionsFlagSetNext | ACTION_MASK_WEAPON;
 			break;
 		}

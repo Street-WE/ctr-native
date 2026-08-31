@@ -8,7 +8,40 @@ static const s32 s_warpballFadeY[6] = {
     -64, -256, -87, 57, 167, 228,
 };
 
-u16 store_wheelsize = 0;
+enum
+{
+    WARPBALL_DRIVER_COUNT = 8,
+};
+
+static u8 s_warpballRideActive[WARPBALL_DRIVER_COUNT];
+
+b32 RB_Warpball_IsDriverRiding(const struct Driver *d)
+{
+    if ((d == NULL) || (d->driverID >= WARPBALL_DRIVER_COUNT))
+    {
+        return false;
+    }
+
+    return s_warpballRideActive[d->driverID] != 0;
+}
+
+void RB_Warpball_SetDriverRiding(struct Driver *d, b32 active)
+{
+    if ((d == NULL) || (d->driverID >= WARPBALL_DRIVER_COUNT))
+    {
+        return;
+    }
+
+    s_warpballRideActive[d->driverID] = active != 0;
+}
+
+void RB_Warpball_ResetRideState(void)
+{
+    for (int i = 0; i < WARPBALL_DRIVER_COUNT; i++)
+    {
+        s_warpballRideActive[i] = 0;
+    }
+}
 
 // NOTE(aalhendi): Native uses retail fade scale/Y table bytes from 0x800b2c88 and 0x800b2cac.
 void RB_Warpball_FadeAway(struct Thread *t)
@@ -55,6 +88,43 @@ void RB_Warpball_FadeAway(struct Thread *t)
 	return;
 }
 
+static s16 RB_Warpball_GetExitAngle(
+    struct TrackerWeapon *tw,
+    struct Instance *warpInst)
+{
+    struct CheckpointNode *exitNode = tw->ptrNodeNext;
+
+    if (exitNode == NULL)
+    {
+        return tw->dir.y;
+    }
+
+    // Look two additional checkpoints ahead.
+    for (int i = 0; i < 5; i++)
+    {
+        exitNode =
+            RB_Warpball_NewPathNode(
+                exitNode,
+                tw->driverParent);
+
+        if (exitNode == NULL)
+        {
+            return tw->dir.y;
+        }
+    }
+
+    int dx = exitNode->pos.x - warpInst->matrix.t[0];
+    int dz = exitNode->pos.z - warpInst->matrix.t[2];
+
+    // Avoid an undefined angle if positions are effectively identical.
+    if ((dx == 0) && (dz == 0))
+    {
+        return tw->dir.y;
+    }
+
+    return ratan2(dx, dz);
+}
+
 void RB_Warpball_Death(struct Thread *t)
 {
 	struct TrackerWeapon *tw;
@@ -66,13 +136,22 @@ void RB_Warpball_Death(struct Thread *t)
 
 	d = tw->driverParent;
 
-	s16 exitDir = tw->dir.x;
+	RB_Warpball_SetDriverRiding(d, false);
 
-	d->forwardDir = exitDir;
+	s16 exitAngle = RB_Warpball_GetExitAngle(tw, inst);
+
+	d->angle = exitAngle;
+	d->rotCurr.y = exitAngle;
+	d->turnAngleCurr = 0;
+	d->turnAnglePrev = 0;
+	d->forwardDir = 1;
+
     d->jump_ForcedMS = 600;
     d->jump_InitialVelY = d->const_JumpForce * 3;
 	VehFire_Increment(tw->driverParent, VEH_PHYS_PROC_SUPER_ENGINE_RESERVES, (TURBO_PAD | SUPER_ENGINE), 128);
-	d->wheelSize = store_wheelsize;
+	d->wheelSize = tw->store_wheelsize;
+	d->instSelf->flags = d->instFlagsBackup;
+	d->instSelf->alphaScale = 0;
 	d->invisibleTimer = 0;
 
 	tw->ptrParticle->framesLeftInLife = 0;
@@ -146,11 +225,12 @@ struct CheckpointNode *RB_Warpball_NewPathNode(struct CheckpointNode *cn, struct
 void RB_Warpball_Start(struct TrackerWeapon *tw)
 {
 	//tw->driverTarget = tw->driverParent;
-	store_wheelsize = tw->driverParent->wheelSize;
+	tw->store_wheelsize = tw->driverParent->wheelSize;
+	RB_Warpball_SetDriverRiding(tw->driverParent, true);
 
 	tw->orbTimeAlive = 0;
-	tw->ptrNodeCurr = RB_Warpball_NewPathNode(tw->ptrNodeCurr, tw->driverTarget);
-	tw->ptrNodeNext = RB_Warpball_NewPathNode(tw->ptrNodeCurr, tw->driverTarget);
+	tw->ptrNodeCurr = RB_Warpball_NewPathNode(tw->ptrNodeCurr, tw->driverParent);
+	tw->ptrNodeNext = RB_Warpball_NewPathNode(tw->ptrNodeCurr, tw->driverParent);
 	return;
 }
 
@@ -313,6 +393,7 @@ void RB_Warpball_ThTick(struct Thread *t)
 		if (tw->orbTimeAlive >= juiced_duration)
 		{
 			RB_Warpball_Death(t);
+			return;
 		}
 	}
 	else
@@ -320,6 +401,7 @@ void RB_Warpball_ThTick(struct Thread *t)
 		if (tw->orbTimeAlive >= normal_duration)
 		{
 			RB_Warpball_Death(t);
+			return;
 		}
 	}
 
@@ -383,7 +465,7 @@ void RB_Warpball_ThTick(struct Thread *t)
 
 			if (tw->parentSafetyFrames > 0)
 			{
-				rotSpeed = 0x40;
+				rotSpeed = 0x400;
 			}
 
 			tw->dir.x = 0;
@@ -562,6 +644,20 @@ void RB_Warpball_ThTick(struct Thread *t)
 
 		if (sps->boolDidTouchQuadblock != 0)
 		{
+			struct QuadBlock *quad = sps->hit.ptrQuadblock;
+
+			if (quad->checkpointIndex != 0xff)
+			{
+				if ((tw->driverParent->actionsFlagSet & ACTION_BOT) == 0)
+				{
+					tw->driverParent->lastValid = quad;
+				}
+				else
+				{
+					tw->driverParent->botData.ai_quadblock_checkpointIndex =
+						quad->checkpointIndex;
+				}
+			}
 			tw->flags |= TRACKER_FLAG_WARPBALL_TURN_AROUND;
 			RB_Warpball_SetQuadblockIndex(tw, sps);
 		}

@@ -1,5 +1,8 @@
 #include <common.h>
 #include <CharacterRegistry.h>
+#if defined(CTR_NATIVE)
+#include <LevelRegistry.h>
+#endif
 
 void Music_SetIntro(void)
 {
@@ -449,6 +452,23 @@ void Music_Adjust(u32 songID, int newTempo, struct SongSet *set, u32 songSetActi
 {
 	songID &= 0xffff;
 
+#if defined(CTR_NATIVE)
+	/*
+	 * A loose WAV replaces CSEQ music for this level, but the HOWL bank
+	 * remains loaded so its sound effects are still available.
+	 */
+	if ((sdata->gGT != NULL) &&
+	    (LevelRegistry_GetMusic(sdata->gGT->levelID) != NULL))
+	{
+		if (sdata->cseqBoolPlay != 0)
+		{
+			CseqMusic_StopAll();
+			Music_End();
+		}
+		return;
+	}
+#endif
+
 	// if cseq music can play
 	if (sdata->cseqBoolPlay != 0)
 	{
@@ -499,6 +519,11 @@ void Music_LowerVolume(void)
 
 		CseqMusic_ChangeVolume(sdata->cseqHighestIndex & 0xffff, setVolume, 8);
 	}
+	#ifdef CTR_NATIVE
+	NativeAudio_SetMusicVolume(
+		(sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT) / 2,
+		(sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT) / 2);
+	#endif
 }
 
 // after "FINAL LAP!" is done
@@ -519,6 +544,11 @@ void Music_RaiseVolume(void)
 
 		CseqMusic_ChangeVolume(sdata->cseqHighestIndex & 0xffff, setVolume, 8);
 	}
+	#ifdef CTR_NATIVE
+	NativeAudio_SetMusicVolume(
+		sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT,
+		sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT);
+	#endif
 }
 
 void Music_Restart(void)

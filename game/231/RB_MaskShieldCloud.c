@@ -108,6 +108,17 @@ void RB_MaskWeapon_ThTick(struct Thread *maskTh)
 	struct InstDrawPerPlayer *maskIdpp = INST_GETIDPP(maskInst);
 	struct InstDrawPerPlayer *beamIdpp = INST_GETIDPP(maskBeamInst);
 
+	if (RB_Warpball_IsDriverRiding(d))
+	{
+		for (int i = 0; i < numPlyr; i++)
+		{
+			maskIdpp[i].pushBuffer = NULL;
+			beamIdpp[i].pushBuffer = NULL;
+		}
+
+		return;
+	}
+
 	if (d->invisibleTimer == 0)
 	{
 		for (int i = 0; i < numPlyr; i++)

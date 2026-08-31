@@ -154,6 +154,11 @@ void howl_VolumeSet(int type, u8 vol)
 		Smart_EnterCriticalSection();
 
 		UpdateChannelVol_Music_All();
+		#ifdef CTR_NATIVE
+		NativeAudio_SetMusicVolume(
+			sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT,
+			sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT);
+		#endif
 	}
 	else if (type == HOWL_VOLUME_TYPE_FX)
 	{

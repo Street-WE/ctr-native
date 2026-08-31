@@ -1,4 +1,5 @@
 #include <common.h>
+#include <LevelRegistry.h>
 
 enum TrackSelectVideoState
 {
@@ -65,7 +66,62 @@ enum
 	MM_TRACK_SELECT_TITLE_TO_MAP_Y = 0x22,
 	MM_TRACK_SELECT_MAP_CENTER_Y_OFFSET = 0x49,
 	MM_TRACK_SELECT_INPUT = BTN_UP | BTN_DOWN | BTN_TRIANGLE | BTN_SQUARE_one | BTN_CROSS_one | BTN_CIRCLE,
+	MM_TRACK_SELECT_NATIVE_MAX_TRACKS = 50,
 };
+
+#if defined(CTR_NATIVE)
+static struct MainMenu_LevelRow s_nativeArcadeTracks[MM_TRACK_SELECT_NATIVE_MAX_TRACKS];
+static const struct LevelDef *s_nativeArcadeLevelDefs[MM_TRACK_SELECT_NATIVE_MAX_TRACKS];
+static s16 s_nativeArcadeTrackCount;
+
+static void MM_TrackSelect_BuildNativeArcadeTracks(void)
+{
+	int index;
+	int additionalCount;
+
+	memcpy(s_nativeArcadeTracks, D230.arcadeTracks, sizeof(D230.arcadeTracks));
+	memset(s_nativeArcadeLevelDefs, 0, sizeof(s_nativeArcadeLevelDefs));
+	s_nativeArcadeTrackCount = MM_TRACK_SELECT_ARCADE_TRACK_COUNT;
+	additionalCount = LevelRegistry_GetAdditionalCount();
+
+	for (index = 0; (index < additionalCount) &&
+	     (s_nativeArcadeTrackCount < MM_TRACK_SELECT_NATIVE_MAX_TRACKS); index++)
+	{
+		const struct LevelDef *level = LevelRegistry_GetAdditional(index);
+		int baseRow;
+		if ((level == NULL) || (level->baseLevelID < 0) ||
+		    (level->baseLevelID >= NITRO_COURT))
+			continue;
+
+		for (baseRow = 0; baseRow < MM_TRACK_SELECT_ARCADE_TRACK_COUNT; baseRow++)
+		{
+			if (D230.arcadeTracks[baseRow].levID == level->baseLevelID)
+				break;
+		}
+		if (baseRow == MM_TRACK_SELECT_ARCADE_TRACK_COUNT)
+			continue;
+
+		s_nativeArcadeTracks[s_nativeArcadeTrackCount] = D230.arcadeTracks[baseRow];
+		s_nativeArcadeTracks[s_nativeArcadeTrackCount].unlock = MM_TRACK_UNLOCK_1P_ONLY;
+		s_nativeArcadeLevelDefs[s_nativeArcadeTrackCount] = level;
+		s_nativeArcadeTrackCount++;
+	}
+}
+
+static struct MainMenu_LevelRow *MM_TrackSelect_GetNativeArcadeTracks(s16 *count)
+{
+	MM_TrackSelect_BuildNativeArcadeTracks();
+	*count = s_nativeArcadeTrackCount;
+	return s_nativeArcadeTracks;
+}
+
+static const struct LevelDef *MM_TrackSelect_GetNativeLevelDef(int row)
+{
+	if ((row < 0) || (row >= s_nativeArcadeTrackCount))
+		return NULL;
+	return s_nativeArcadeLevelDefs[row];
+}
+#endif
 
 
 void MM_TrackSelect_Video_SetDefaults(void)
@@ -349,6 +405,10 @@ void MM_TrackSelect_Init(void)
 	struct MainMenu_LevelRow *selectMenu = D230.arcadeTracks;
 	s16 numTracks = MM_TRACK_SELECT_ARCADE_TRACK_COUNT;
 
+#if defined(CTR_NATIVE)
+	selectMenu = MM_TrackSelect_GetNativeArcadeTracks(&numTracks);
+#endif
+
 	// lap selection menu is closed by default
 	D230.trackSelect.lapBoxOpen = false;
 	D230.trackSelect.transition.state = ENTERING_MENU;
@@ -438,6 +498,7 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 				// if track has not been chosen
 				if (D230.trackSelect.transition.startAfterExit == 0)
 				{
+					LevelRegistry_SetActive(NULL);
 					// return to character selection
 					sdata->ptrDesiredMenu = &D230.menuCharacterSelect;
 					MM_Characters_RestoreIDs();
@@ -468,6 +529,14 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 					// by default, dont show ghost in race
 					sdata->boolReplayHumanGhost = 0;
 
+#if defined(CTR_NATIVE)
+					if (LevelRegistry_GetActive() != NULL)
+					{
+						sdata->ptrDesiredMenu = &data.menuQueueLoadTrack;
+						return;
+					}
+#endif
+
 					SelectProfile_ToggleMode(SELECT_PROFILE_SCREEN_GHOST);
 
 					// open the ghost selection menu
@@ -492,6 +561,10 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 	// default arcade tracks
 	struct MainMenu_LevelRow *selectMenu = &D230.arcadeTracks[0];
 	s16 numTracks = MM_TRACK_SELECT_ARCADE_TRACK_COUNT;
+
+#if defined(CTR_NATIVE)
+	selectMenu = MM_TrackSelect_GetNativeArcadeTracks(&numTracks);
+#endif
 
 	// if you are in battle mode
 	if ((gGT->gameMode1 & BATTLE_MODE) != 0)
@@ -677,6 +750,10 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 	MM_TrackSelect_Video_State(resetPreviewVideo);
 
 	gGT->currLEV = selectMenu[menu->rowSelected].levID;
+#if defined(CTR_NATIVE)
+	if ((gGT->gameMode1 & BATTLE_MODE) == 0)
+		LevelRegistry_SetActive(MM_TrackSelect_GetNativeLevelDef(menu->rowSelected));
+#endif
 	s32 scanTrack = (int)menu->rowSelected + -1;
 
 	for (s32 hiddenRowIndex = 0; hiddenRowIndex < MM_TRACK_SELECT_CENTER_ROW; hiddenRowIndex++)
@@ -732,6 +809,11 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 		// if you are in time trial mode
 		if ((gGT->gameMode1 & TIME_TRIAL) != 0)
 		{
+#if defined(CTR_NATIVE)
+			const struct LevelDef *rowLevel = MM_TrackSelect_GetNativeLevelDef(currTrack);
+			if (rowLevel == NULL)
+#endif
+			{
 			// backup level ID
 			s16 previousLevelID = gGT->levelID;
 
@@ -775,17 +857,43 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 
 			// (useless?)
 			GAMEPROG_GetPtrHighScoreTrack();
+			}
 		}
 
 		// Draw string
-		DecalFont_DrawLine(sdata->lngStrings[data.metaDataLEV[selectMenu[currTrack].levID].name_LNG], (rowX + MM_TRACK_SELECT_ROW_NAME_X_OFFSET),
-		                   (rowBaseY + MM_TRACK_SELECT_ROW_NAME_Y_OFFSET), FONT_BIG, ORANGE);
+		char *trackName;
+#if defined(CTR_NATIVE)
+		const struct LevelDef *rowLevel = MM_TrackSelect_GetNativeLevelDef(currTrack);
+		if (rowLevel != NULL)
+			trackName = (char *)rowLevel->name;
+		else
+#endif
+		{
+			const struct LevelDef *replacement =
+				LevelRegistry_GetReplacement(selectMenu[currTrack].levID);
+			trackName = replacement != NULL ? (char *)replacement->name :
+				sdata->lngStrings[data.metaDataLEV[selectMenu[currTrack].levID].name_LNG];
+		}
+		int trackNameFont = FONT_BIG;
+		int trackNameY = rowBaseY + MM_TRACK_SELECT_ROW_NAME_Y_OFFSET;
+		if (DecalFont_GetLineWidth(trackName, trackNameFont) >
+		    MM_TRACK_SELECT_ROW_W - (MM_TRACK_SELECT_ROW_NAME_X_OFFSET * 2))
+		{
+			trackNameFont = FONT_SMALL;
+			trackNameY += (data.font_charPixHeight[FONT_BIG] - data.font_charPixHeight[FONT_SMALL]) / 2;
+		}
+		DecalFont_DrawLine(trackName, rowX + MM_TRACK_SELECT_ROW_NAME_X_OFFSET,
+		                   trackNameY, trackNameFont, ORANGE);
 
 		if ((D230.trackSelect.trackChangeFrames == 0) && ((s16)rowIndex == MM_TRACK_SELECT_CENTER_ROW))
 		{
 			// if you are in time trial mode
 			if ((gGT->gameMode1 & TIME_TRIAL) != 0)
 			{
+#if defined(CTR_NATIVE)
+				if (MM_TrackSelect_GetNativeLevelDef(currTrack) != NULL)
+					goto skipCustomGhostText;
+#endif
 				// Check if this track has Ghost Data
 				s16 ghostProfileCount = RefreshCard_CountGhostProfilesForLEV(selectMenu[currTrack].levID);
 
@@ -808,6 +916,10 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 					                   (rowX + MM_TRACK_SELECT_ROW_NAME_X_OFFSET + MM_TRACK_SELECT_GHOST_TEXT_FROM_NAME_X),
 					                   (rowBaseY + MM_TRACK_SELECT_GHOST_TEXT_Y_OFFSET), FONT_SMALL, ghostTextFlags);
 				}
+#if defined(CTR_NATIVE)
+			skipCustomGhostText:
+#endif
+				;
 			}
 			RECT highlightRect;
 			highlightRect.x = rowRect.x + MM_TRACK_SELECT_HIGHLIGHT_INSET_X;

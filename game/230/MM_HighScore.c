@@ -1,4 +1,5 @@
 #include <common.h>
+#include <LevelRegistry.h>
 
 enum
 {
@@ -84,7 +85,8 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 
 	s16 levelID = D230.arcadeTracks[trackIndex].levID;
 
-	s16 lineWidth = DecalFont_GetLineWidth(sdata->lngStrings[data.metaDataLEV[levelID].name_LNG], FONT_BIG);
+	char *levelName = LevelRegistry_GetName(levelID, sdata->lngStrings[data.metaDataLEV[levelID].name_LNG]);
+	s16 lineWidth = DecalFont_GetLineWidth(levelName, FONT_BIG);
 	lineWidth = lineWidth >> 1;
 
 	// get color data
@@ -108,7 +110,7 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 	                 colorPtr[2], colorPtr[3], 0, MM_HIGHSCORE_ARROW_SCALE, 0);
 
 	// draw track name
-	DecalFont_DrawLine(sdata->lngStrings[data.metaDataLEV[levelID].name_LNG], titleMeta->currX + (s16)(posX + MM_HIGHSCORE_TITLE_X_OFFSET),
+	DecalFont_DrawLine(levelName, titleMeta->currX + (s16)(posX + MM_HIGHSCORE_TITLE_X_OFFSET),
 	                   titleMeta->currY + (s16)(posY + MM_HIGHSCORE_TITLE_Y_OFFSET), FONT_BIG, JUSTIFY_CENTER);
 
 	Color iconColor = D230.highscore_iconColor;

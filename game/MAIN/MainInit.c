@@ -1,5 +1,6 @@
 #include <common.h>
 #include <CharacterRegistry.h>
+#include <LevelRegistry.h>
 
 #ifdef CTR_NATIVE
 static void MainInit_InitVisMemBspListNodes(struct VisMem *visMem, struct mesh_info *mesh)
@@ -82,6 +83,14 @@ void MainInit_RainBuffer(struct GameTracker *gGT)
 static int MainInit_GetPrimMemSize(struct GameTracker *gGT)
 {
 	int levelID;
+
+#if defined(CTR_NATIVE)
+	int overrideSize = LevelRegistry_GetPrimMemSize(gGT->levelID);
+	if (overrideSize != 0)
+	{
+		return overrideSize;
+	}
+#endif
 
 	// adv garage
 	if (gGT->levelID == ADVENTURE_GARAGE)
