@@ -141,6 +141,7 @@ global_variable GLuint s_presentVramShader = 0;
 global_variable GLint s_presentVramSourceRectLoc = -1;
 global_variable GLuint s_vramQuadVAO = 0;
 global_variable GLuint s_vramQuadVBO = 0;
+global_variable GLuint s_presentRgbaShader = 0;
 
 internal int NativeRenderer_InitialiseGLContext(char *windowName, int fullscreen);
 internal int NativeRenderer_InitialiseGLExt(void);
@@ -155,9 +156,11 @@ internal void NativeRenderer_SetWireframe(int enable);
 internal void NativeRenderer_InitRenderTarget(struct NativeRenderTarget *target);
 internal void NativeRenderer_DestroyRenderTarget(struct NativeRenderTarget *target);
 internal void NativeRenderer_EnsureRenderTarget(struct NativeRenderTarget *target, int width, int height);
+internal int NativeRenderer_GetInternalResolutionScale(void);
+internal int NativeRenderer_ScaleCoord(int value);
 internal void NativeRenderer_BindMainRenderTarget(void);
 internal void NativeRenderer_DrawVRAMRegion(int x, int y, int width, int height);
-internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget *target, int x, int y);
+internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget *target, int x, int y, int sourceWidth, int sourceHeight);
 #if defined(CTR_INTERNAL)
 internal void NativeRenderer_ResolveGpuMeasurements(b32 waitForResults);
 #endif
@@ -280,6 +283,7 @@ void NativeRenderer_Shutdown(void)
 	NativeRenderer_DestroyTexture(s_rgLutTexture);
 	glDeleteProgram(s_packShader);
 	glDeleteProgram(s_presentVramShader);
+	glDeleteProgram(s_presentRgbaShader);
 	glDeleteVertexArrays(1, &s_vramQuadVAO);
 	glDeleteBuffers(1, &s_vramQuadVBO);
 }
@@ -347,7 +351,7 @@ void NativeRenderer_BeginScene(void)
 	NativeRenderer_UpdateVRAM();
 	if (!activeDrawEnv.isbg)
 	{
-		NativeRenderer_LoadRenderTargetFromVRAM(&s_mainRenderTarget, activeDispEnv.disp.x, activeDispEnv.disp.y);
+		NativeRenderer_LoadRenderTargetFromVRAM(&s_mainRenderTarget,activeDispEnv.disp.x,activeDispEnv.disp.y,activeDispEnv.disp.w,activeDispEnv.disp.h);
 	}
 	else
 	{
@@ -556,7 +560,9 @@ internal void NativeRenderer_BindMainRenderTarget(void)
 		height = activeDrawEnv.clip.h;
 	}
 
-	NativeRenderer_EnsureRenderTarget(&s_mainRenderTarget, width, height);
+	const int scale = NativeRenderer_GetInternalResolutionScale();
+
+	NativeRenderer_EnsureRenderTarget(&s_mainRenderTarget, width * scale, height * scale);
 	glBindFramebuffer(GL_FRAMEBUFFER, s_mainRenderTarget.framebuffer);
 }
 
@@ -570,7 +576,7 @@ internal void NativeRenderer_DrawVRAMRegion(int x, int y, int width, int height)
 	NativeRenderer_DrawTriangles(0, 2);
 }
 
-internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget *target, int x, int y)
+internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget *target,int x,int y,int sourceWidth,int sourceHeight)
 {
 	const ShaderID previousShader = s_previousShader;
 	const TextureID previousTexture = s_lastBoundTexture;
@@ -583,7 +589,7 @@ internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget 
 	glDisable(GL_SCISSOR_TEST);
 	glDisable(GL_STENCIL_TEST);
 	glViewport(0, 0, target->width, target->height);
-	NativeRenderer_DrawVRAMRegion(x, y, target->width, target->height);
+	NativeRenderer_DrawVRAMRegion(x, y, sourceWidth, sourceHeight);
 	glClear(GL_STENCIL_BUFFER_BIT);
 	glEnable(GL_STENCIL_TEST);
 
@@ -605,6 +611,19 @@ internal void NativeRenderer_LoadRenderTargetFromVRAM(struct NativeRenderTarget 
 	NativeRenderer_SetBlendMode(previousBlendMode);
 	NativeRenderer_SetScissorState(previousScissorState);
 }
+
+internal int NativeRenderer_GetInternalResolutionScale(void)
+{
+    return g_cfg_internalResolutionScale > 0
+        ? g_cfg_internalResolutionScale
+        : 1;
+}
+
+internal int NativeRenderer_ScaleCoord(int value)
+{
+    return value * NativeRenderer_GetInternalResolutionScale();
+}
+
 
 internal void NativeRenderer_ClearHostRect(int x, int y, int width, int height)
 {
@@ -1112,9 +1131,35 @@ global_variable const char *ctr_present_vram_shader = "#ifdef VERTEX\n"
                                                       "}\n"
                                                       "#endif\n";
 
+global_variable const char *ctr_present_rgba_shader =
+    "#ifdef VERTEX\n"
+    "attribute vec2 a_position;\n"
+    "varying vec2 v_uv;\n"
+    "void main() {\n"
+    "\tv_uv = a_position * 0.5 + 0.5;\n"
+    "\tgl_Position = vec4(a_position, 0.0, 1.0);\n"
+    "}\n"
+    "#endif\n"
+    "#ifdef FRAGMENT\n"
+    "varying vec2 v_uv;\n"
+    "uniform sampler2D s_texture;\n"
+    "void main() {\n"
+    "\tfragColor = texture2D(s_texture, v_uv);\n"
+    "}\n"
+    "#endif\n";
+
 internal void NativeRenderer_InitVRAMPipelines(void)
 {
 	local_persist const float quad[12] = {-1.f, -1.f, -1.f, 1.f, 1.f, 1.f, -1.f, -1.f, 1.f, 1.f, 1.f, -1.f};
+
+	s_presentRgbaShader =
+    NativeRenderer_Shader_Compile(ctr_present_rgba_shader, false);
+
+	glUseProgram(s_presentRgbaShader);
+	glUniform1i(
+		glGetUniformLocation(s_presentRgbaShader, "s_texture"),
+		0);
+	glUseProgram(0);
 
 	s_packShader = NativeRenderer_Shader_Compile(ctr_pack_shader, false);
 	glUseProgram(s_packShader);
@@ -1190,7 +1235,7 @@ int NativeRenderer_InitialisePSX(void)
 	glBlendColor(0.5f, 0.5f, 0.5f, 0.25f);
 
 	// Main and offscreen draws share one explicit render-target contract. The
-	// main target stays at CTR's logical display size; host scaling is deferred
+	// main target uses the configured internal scale while the off-screen VRAM target remains native-resolution.
 	// to presentation.
 	NativeRenderer_InitRenderTarget(&s_mainRenderTarget);
 	NativeRenderer_InitRenderTarget(&s_offscreenRenderTarget);
@@ -1335,7 +1380,17 @@ void NativeRenderer_SetupClipMode(const RECT16 *rect, const DISPENV *displayEnv,
 	const float crw = clipRectW * viewportW;
 	const float crh = clipRectH * viewportH;
 
-	glScissor(crx, flipOffset - cry, crw, crh);
+	const int scissorX = (int)crx;
+	const int scissorY = (int)(flipOffset - cry);
+	const int scissorW = (int)crw;
+	const int scissorH = (int)crh;
+
+	glScissor(
+		NativeRenderer_ScaleCoord(scissorX),
+		NativeRenderer_ScaleCoord(scissorY),
+		NativeRenderer_ScaleCoord(scissorW),
+		NativeRenderer_ScaleCoord(scissorH)
+	);
 }
 
 internal void NativeRenderer_SetShader(const ShaderID shader)
@@ -1705,7 +1760,13 @@ void NativeRenderer_Clear(int x, int y, int w, int h, u8 r, u8 g, u8 b)
 	glGetIntegerv(GL_SCISSOR_BOX, previousScissorBox);
 
 	glEnable(GL_SCISSOR_TEST);
-	glScissor(scissorX, scissorY, scissorW, scissorH);
+
+	const int scaledScissorX = NativeRenderer_ScaleCoord(scissorX);
+	const int scaledScissorY = NativeRenderer_ScaleCoord(scissorY);
+	const int scaledScissorW = NativeRenderer_ScaleCoord(scissorW);
+	const int scaledScissorH = NativeRenderer_ScaleCoord(scissorH);
+
+	glScissor(scaledScissorX, scaledScissorY, scaledScissorW, scaledScissorH);
 	glClearColor(NativeRenderer_PSXColorComponentFloat(r), NativeRenderer_PSXColorComponentFloat(g), NativeRenderer_PSXColorComponentFloat(b), 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
@@ -1895,7 +1956,7 @@ void NativeRenderer_SetOffscreenState(const RECT16 *offscreenRect, int enable)
 		s_previousOffscreenState = 1;
 		NativeRenderer_EnsureRenderTarget(&s_offscreenRenderTarget, offscreenRect->w, offscreenRect->h);
 		s_previousOffscreen = *offscreenRect;
-		NativeRenderer_LoadRenderTargetFromVRAM(&s_offscreenRenderTarget, offscreenRect->x, offscreenRect->y);
+		NativeRenderer_LoadRenderTargetFromVRAM(&s_offscreenRenderTarget,offscreenRect->x,offscreenRect->y,offscreenRect->w,offscreenRect->h);
 	}
 	else
 	{
@@ -2100,6 +2161,39 @@ void NativeRenderer_UpdateVRAM(void)
 	s_lastBoundTexture = (TextureID)-1;
 
 	NativePerf_EndScope(NATIVE_PERF_BUCKET_RENDERER_UPDATE_VRAM);
+}
+
+void NativeRenderer_PresentMainRenderTarget(void)
+{
+    if ((s_mainRenderTarget.width <= 0) ||
+        (s_mainRenderTarget.height <= 0))
+    {
+        return;
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    NativeRenderer_SetViewPort(
+        s_presentViewport.x,
+        s_presentViewport.y,
+        s_presentViewport.w,
+        s_presentViewport.h);
+
+    NativeRenderer_SetScissorState(0);
+    NativeRenderer_EnableDepth(0);
+    NativeRenderer_SetBlendMode(BM_NONE);
+
+    glUseProgram(s_presentRgbaShader);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, s_mainRenderTarget.texture);
+
+    glBindVertexArray(s_vramQuadVAO);
+    NativeRenderer_DrawTriangles(0, 2);
+    glBindVertexArray(0);
+
+    s_previousShader = (ShaderID)-1;
+    s_lastBoundTexture = (TextureID)-1;
 }
 
 void NativeRenderer_PresentVRAMRect(int displayX, int displayY, int displayW, int displayH)

@@ -632,8 +632,8 @@ void StateZero()
 	DrawSync(0);
 
 	// Load Intro TIM for "SCEA Presents" from VRAM file
-	LOAD_VramFile(sdata->ptrBigfile1, 0x1fd, NULL, &vramSize, -1);
-	MainInit_VRAMDisplay();
+	//LOAD_VramFile(sdata->ptrBigfile1, 0x1fd, NULL, &vramSize, -1);
+	//MainInit_VRAMDisplay();
 
 	// \SOUNDS\KART.HWL;1
 	howl_InitGlobals(data.kartHwlPath);
