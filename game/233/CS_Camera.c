@@ -224,6 +224,142 @@ void CS_Camera_ThTick_Boss(struct Thread *t)
 	}
 }
 
+
+void CS_Camera_ThTick_PodiumSkip(struct Thread *th)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	s16 rewardId;
+	s16 hintID;
+
+	// First-time Arcade cup completion may require a save prompt.
+	if ((gGT->gameMode2 & CUP_NEW_WIN) != 0)
+	{
+		if (sdata->ptrActiveMenu == NULL)
+		{
+			s16 stringIndex = LNG_SAVE_YOUR_CUP_PROGRESS;
+
+			if ((gGT->gameMode2 & CUP_NEW_BATTLE) != 0)
+			{
+				stringIndex =
+					LNG_SAVE_YOUR_CUP_PROGRESS_NEW_BATTLE_ARENA_OPENED;
+			}
+
+			TakeCupProgress_Activate(stringIndex);
+			gGT->gameMode2 &= ~(CUP_NEW_WIN | CUP_NEW_BATTLE);
+		}
+
+		return;
+	}
+
+	// Wait for the save/profile menus to finish.
+	if (sdata->ptrActiveMenu != NULL)
+	{
+		return;
+	}
+
+	// Arcade cup: return to the title after any save prompt.
+	if ((gGT->gameMode1 & ADVENTURE_MODE) == 0)
+	{
+		sdata->mainMenuState = MAIN_MENU_TITLE;
+
+		gGT->gameMode1 =
+			(gGT->gameMode1 & ~ADVENTURE_ARENA) | MAIN_MENU;
+
+		gGT->podiumRewardID = NOFUNC;
+		gGT->gameMode2 &= ~VEH_FREEZE_PODIUM;
+
+		RaceFlag_SetDrawOrder(0);
+		th->flags |= THREAD_FLAG_DEAD;
+
+		MainRaceTrack_RequestLoad(MAIN_MENU_LEVEL);
+		return;
+	}
+
+	rewardId = gGT->podiumRewardID;
+
+	// Oxide victory: go directly to the appropriate ending.
+	if (rewardId == STATIC_BIG1)
+	{
+		gGT->podiumRewardID = NOFUNC;
+		gGT->gameMode1 &= ~ADVENTURE_ARENA;
+		gGT->gameMode2 &= ~VEH_FREEZE_PODIUM;
+
+		th->flags |= THREAD_FLAG_DEAD;
+
+		MainRaceTrack_RequestLoad(
+			CHECK_ADV_BIT(
+				sdata->advProgress.rewards,
+				ADV_REWARD_BEAT_OXIDE_SECOND)
+				? OXIDE_TRUE_ENDING
+				: OXIDE_ENDING);
+
+		return;
+	}
+
+	// Keys, the eighteenth relic, and newly opened boss doors still
+	// need their existing Adventure boss conversation.
+	if (CS_Camera_BoolGotoBoss())
+	{
+		D233.isCutsceneOver = 0;
+		D233.cutsceneState = CS_WAIT_INPUT;
+		th->funcThTick = CS_Camera_ThTick_Boss;
+
+		if ((rewardId == STATIC_RELIC) &&
+		    (gGT->currAdvProfile.numRelics >=
+		     ADV_OXIDE_FINAL_RELIC_COUNT))
+		{
+			D233.bossCutsceneIndex =
+				gGT->levelID -
+				GEM_STONE_VALLEY +
+				OXIDE_RELICS_GEMSTONE;
+		}
+		else
+		{
+			D233.bossCutsceneIndex = -1;
+		}
+
+		return;
+	}
+
+	// Ordinary Adventure reward: stay in the hub and show the
+	// usual Aku Aku/Uka Uka reward message.
+	switch (rewardId)
+	{
+	case STATIC_TROPHY:
+		hintID = ADV_MASK_HINT_ID_TROPHY_AWARDED;
+		break;
+
+	case STATIC_RELIC:
+		hintID = ADV_MASK_HINT_ID_RELIC_AWARDED;
+		break;
+
+	case STATIC_KEY:
+		hintID = ADV_MASK_HINT_ID_KEY_AWARDED;
+		break;
+
+	case STATIC_TOKEN:
+		hintID = ADV_MASK_HINT_ID_CTR_TOKEN_AWARDED;
+		break;
+
+	default:
+		hintID = ADV_MASK_HINT_ID_GEM_AWARDED;
+		break;
+	}
+
+	if (!VehPickupItem_MaskBoolGoodGuy(gGT->drivers[0]))
+	{
+		hintID += ADV_MASK_HINT_UKA_UKA_XA_OFFSET;
+	}
+
+	gGT->podiumRewardID = NOFUNC;
+	gGT->gameMode2 &= ~VEH_FREEZE_PODIUM;
+	gGT->overlayTransition = 2;
+	th->flags |= THREAD_FLAG_DEAD;
+
+	CDSYS_XAPauseForce();
+	CDSYS_XAPlay(1, hintID);
+}
+
 void CS_Camera_ThTick_Podium(struct Thread *th)
 {
 	struct GameTracker *gGT = sdata->gGT;

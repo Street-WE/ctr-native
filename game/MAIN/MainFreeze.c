@@ -63,7 +63,7 @@ void MainFreeze_ConfigDrawArrows(s16 offsetX, s16 offsetY, char *str)
 	lineWidth = DecalFont_GetLineWidth(str, 1) >> 1;
 
 	// get color data
-	colorPtr = data.ptrColor[color];
+	colorPtr = Color_GetGradient(color);
 
 	struct Icon **iconPtrArray = ICONGROUP_GETICONS(gGT->iconGroup[4]);
 

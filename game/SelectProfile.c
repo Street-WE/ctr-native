@@ -283,7 +283,7 @@ void SelectProfile_Init(u16 flags)
 					slot = i % 3;
 
 					inst->flags |= HIDE_MODEL | SCREENSPACE_INSTANCE;
-					if (slot != 1)
+					if ((slot != 1) && (model->id != -1))
 					{
 						inst->flags |= USE_SPECULAR_LIGHT;
 					}

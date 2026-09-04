@@ -366,6 +366,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		}
 
 		LOAD_ClearLooseRacerModels();
+#if defined(CTR_NATIVE)
+		LOAD_LoadLooseStaticModels();
+#endif
 
 		// NOTE(aalhendi): Retail gates stage advancement until the driver MPK callback sets ptrMPK.
 		sdata->load_inProgress = 1;
@@ -384,6 +387,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		}
 
 		LOAD_GlobalModelPtrs_MPK();
+#if defined(CTR_NATIVE)
+		LOAD_ApplyLooseStaticModels(gGT);
+#endif
 		DecalGlobal_Clear(gGT);
 
 		gGT->mpkIcons = 0;
@@ -553,6 +559,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		if (lev != 0)
 		{
 			LibraryOfModels_Store(gGT, lev->numModels, lev->ptrModelsPtrArray);
+#if defined(CTR_NATIVE)
+			LOAD_ApplyLooseStaticModels(gGT);
+#endif
 
 			gGT->ptrCircle = (u32)DecalGlobal_FindInLEV(lev, rdata.s_circle);
 			gGT->ptrClod = (u32)DecalGlobal_FindInLEV(lev, rdata.s_clod);
@@ -585,7 +594,8 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		{
 			break;
 		}
-
+		/*
+		* Commented out to stop podiums from happening
 		// === Assume PodiumReward Active ===
 
 		// Set Pack of the hub you're NOT on
@@ -652,11 +662,14 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 		// Disable LEV instances on Adv Hub, for podium scene
 		gGT->gameMode2 = gGT->gameMode2 | NO_LEV_INSTANCE;
+		*/
 		break;
 	}
 	case 8:
 	{
 		// If going to the podium
+		/*
+		//Commented out relating to skipping podiums
 		if (((gGT->gameMode1 & ADVENTURE_ARENA) != 0) && (gGT->podiumRewardID != NOFUNC) // 0
 		)
 		{
@@ -687,6 +700,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 			MEMPACK_SwapPacks(gGT->activeMempackIndex);
 		}
+		*/
 
 		// Level ID
 		int currentLevelID = gGT->levelID;
@@ -709,7 +723,13 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// One of the maps on Adventure Arena
 		if ((u32)(currentLevelID - GEM_STONE_VALLEY) < LOAD_ADV_HUB_COUNT)
 		{
+			//Changed relating to skipping podiums
 			audioState = AUDIO_ADV_HUB_WAIT;
+
+			if (gGT->podiumRewardID == NOFUNC)
+			{
+				audioState = AUDIO_ADV_HUB;
+			}
 
 			// podium reward
 			if (gGT->podiumRewardID == NOFUNC) // 0

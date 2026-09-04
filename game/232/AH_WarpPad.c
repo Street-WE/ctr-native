@@ -1167,7 +1167,8 @@ void AH_WarpPad_LInB(struct Instance *inst)
 					if (rewardModelID == STATIC_RELIC)
 					{
 						newInst->colorRGBA = INST_COLOR_SAPPHIRE_RELIC;
-						newInst->flags |= USE_SPECULAR_LIGHT;
+						if (newInst->model->id != -1)
+							newInst->flags |= USE_SPECULAR_LIGHT;
 						CTR_SET_VEC3(CTR_VECTOR_DATA(&(newInst->scale)), AH_WP_RELIC_PRIZE_SCALE, AH_WP_RELIC_PRIZE_SCALE, AH_WP_RELIC_PRIZE_SCALE);
 					}
 
@@ -1208,7 +1209,8 @@ void AH_WarpPad_LInB(struct Instance *inst)
 				// relic blue
 				newInst->colorRGBA = INST_COLOR_SAPPHIRE_RELIC;
 
-				newInst->flags |= USE_SPECULAR_LIGHT;
+				if (newInst->model->id != -1)
+					newInst->flags |= USE_SPECULAR_LIGHT;
 
 				warppadObj->lightDirRelic = D232.lightDirRelic[0];
 
@@ -1277,7 +1279,8 @@ void AH_WarpPad_LInB(struct Instance *inst)
 					// relic blue
 					newInst->colorRGBA = INST_COLOR_SAPPHIRE_RELIC;
 
-					newInst->flags |= USE_SPECULAR_LIGHT;
+					if (newInst->model->id != -1)
+						newInst->flags |= USE_SPECULAR_LIGHT;
 
 					warppadObj->lightDirRelic = D232.lightDirRelic[0];
 
@@ -1416,7 +1419,8 @@ void AH_WarpPad_LInB(struct Instance *inst)
 	// no specular for trophy
 	if (unlockItem_modelID != STATIC_TROPHY)
 	{
-		newInst->flags |= USE_SPECULAR_LIGHT;
+		if (newInst->model->id != -1)
+			newInst->flags |= USE_SPECULAR_LIGHT;
 
 		// relic
 		if (unlockItem_modelID == STATIC_RELIC)

@@ -20,7 +20,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Rocket Racer",
         .shortName = "R. Racer",
         .engineClass = SPEED,
-        .minimapColor = CORTEX_RED,
+        .minimapColor = EXT_COLOR_RED_BLUE_GRADIENT,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [TINY_TIGER] = {
@@ -80,7 +80,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Royal King",
         .shortName = "King",
         .engineClass = TURN,
-        .minimapColor = CRASH_BLUE,
+        .minimapColor = EXT_COLOR_KING_GOLD,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [PINSTRIPE] = {
@@ -90,7 +90,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Johnny Thunder",
         .shortName = "J. Thunder",
         .engineClass = BALANCED,
-        .minimapColor = PAPU_YELLOW,
+        .minimapColor = EXT_COLOR_JOHNNY_BROWN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [PAPU_PAPU] = {
@@ -120,7 +120,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Basil the Batlord",
         .shortName = "Basil",
         .engineClass = SPEED,
-        .minimapColor = DARK_RED,
+        .minimapColor = EXT_COLOR_BASIL_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [N_TROPY] = {
@@ -140,7 +140,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Baron Von Barron",
         .shortName = "Barron",
         .engineClass = TURN,
-        .minimapColor = GRAY,
+        .minimapColor = EXT_COLOR_BARON_TAN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [FAKE_CRASH] = {
@@ -170,7 +170,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Black Knight",
         .shortName = "B. Knight",
         .engineClass = SPEED,
-        .minimapColor = BLACK,
+        .minimapColor = EXT_COLOR_KNIGHT_BLACK,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_GAIL] = {
@@ -180,7 +180,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Gail Storm",
         .shortName = "G. Storm",
         .engineClass = BALANCED,
-        .minimapColor = PLAYER_GREEN,
+        .minimapColor = EXT_COLOR_GAIL_GREEN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_HAWKINS] = {
@@ -210,7 +210,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Achu",
         .shortName = "Achu",
         .engineClass = BALANCED,
-        .minimapColor = PAPU_YELLOW,
+        .minimapColor = EXT_COLOR_GOLD_GRADIENT,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_TURBOC] = {
@@ -220,7 +220,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Turbo Charger",
         .shortName = "Turbo. C",
         .engineClass = SPEED,
-        .minimapColor = PENTA_WHITE,
+        .minimapColor = EXT_COLOR_TURBO_GRN_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_ADMIRAL] = {
@@ -230,7 +230,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Admiral",
         .shortName = "Admiral",
         .engineClass = TURN,
-        .minimapColor = PERIWINKLE,
+        .minimapColor = EXT_COLOR_ADMIRAL_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_ALPHA] = {
@@ -240,7 +240,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Alpha Dragonis",
         .shortName = "Alpha",
         .engineClass = TURN,
-        .minimapColor = LIGHT_GREEN,
+        .minimapColor = EXT_COLOR_ALPHA_GRN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_ISLANDER] = {
@@ -250,7 +250,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Islander",
         .shortName = "Islander",
         .engineClass = TURN,
-        .minimapColor = ROO_ORANGE,
+        .minimapColor = EXT_COLOR_ISLANDER_ORANGE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_JOAN] = {
@@ -270,7 +270,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Nova Hunter",
         .shortName = "N. Hunter",
         .engineClass = BALANCED,
-        .minimapColor = FAKE_CRASH_GRAY,
+        .minimapColor = EXT_COLOR_NOVA_GREY,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [X_SCOOTER] = {

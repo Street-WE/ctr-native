@@ -667,7 +667,8 @@ void MainInit_FinalizeInit(struct GameTracker *gGT)
 		// 0
 		if (gGT->podiumRewardID != NOFUNC)
 		{
-			CS_Podium_FullScene_Init();
+			//CS_Podium_FullScene_Init();
+			CS_Podium_SkipScene_Init();
 		}
 	}
 

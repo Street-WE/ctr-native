@@ -88,43 +88,6 @@ void RB_Warpball_FadeAway(struct Thread *t)
 	return;
 }
 
-static s16 RB_Warpball_GetExitAngle(
-    struct TrackerWeapon *tw,
-    struct Instance *warpInst)
-{
-    struct CheckpointNode *exitNode = tw->ptrNodeNext;
-
-    if (exitNode == NULL)
-    {
-        return tw->dir.y;
-    }
-
-    // Look two additional checkpoints ahead.
-    for (int i = 0; i < 5; i++)
-    {
-        exitNode =
-            RB_Warpball_NewPathNode(
-                exitNode,
-                tw->driverParent);
-
-        if (exitNode == NULL)
-        {
-            return tw->dir.y;
-        }
-    }
-
-    int dx = exitNode->pos.x - warpInst->matrix.t[0];
-    int dz = exitNode->pos.z - warpInst->matrix.t[2];
-
-    // Avoid an undefined angle if positions are effectively identical.
-    if ((dx == 0) && (dz == 0))
-    {
-        return tw->dir.y;
-    }
-
-    return ratan2(dx, dz);
-}
-
 void RB_Warpball_Death(struct Thread *t)
 {
 	struct TrackerWeapon *tw;
@@ -136,15 +99,26 @@ void RB_Warpball_Death(struct Thread *t)
 
 	d = tw->driverParent;
 
-	RB_Warpball_SetDriverRiding(d, false);
+	s16 exitAngle = tw->dir.y;
 
-	s16 exitAngle = RB_Warpball_GetExitAngle(tw, inst);
+	RB_Warpball_SetDriverRiding(d, false);
 
 	d->angle = exitAngle;
 	d->rotCurr.y = exitAngle;
 	d->turnAngleCurr = 0;
 	d->turnAnglePrev = 0;
 	d->forwardDir = 1;
+
+	if (d->speed < 0)
+	{
+		d->speed = -d->speed;
+	}
+
+	if (d->speedApprox < 0)
+	{
+		d->speedApprox = -d->speedApprox;
+	}
+	VehPhysForce_ConvertSpeedToVec(d);
 
     d->jump_ForcedMS = 600;
     d->jump_InitialVelY = d->const_JumpForce * 3;
@@ -224,7 +198,23 @@ struct CheckpointNode *RB_Warpball_NewPathNode(struct CheckpointNode *cn, struct
 
 void RB_Warpball_Start(struct TrackerWeapon *tw)
 {
-	//tw->driverTarget = tw->driverParent;
+	struct Driver *d = tw->driverParent;
+
+	if (d->kartState == KS_DRIFTING)
+    {
+        VehPhysProc_PowerSlide_Finalize(d);
+        VehPhysProc_Driving_Init(d->instSelf->thread, d);
+    }
+
+    // Clear residual steering/drift values.
+    d->multDrift = 0;
+    d->simpTurnState = 0;
+    d->ampTurnState = 0;
+    d->rotationSpinRate = 0;
+    d->turnAngleLerpVel = 0;
+    d->turnAngleCurr = 0;
+    d->turnAnglePrev = 0;
+
 	tw->store_wheelsize = tw->driverParent->wheelSize;
 	RB_Warpball_SetDriverRiding(tw->driverParent, true);
 
@@ -573,7 +563,8 @@ void RB_Warpball_ThTick(struct Thread *t)
 	tw->driverParent->instSelf->matrix.t[1] = (inst->matrix.t[1] + vertical_offset);
 	tw->driverParent->instSelf->matrix.t[2] = inst->matrix.t[2];
 
-	tw->driverParent->rotCurr.x = tw->dir.y;
+	//tw->driverParent->rotCurr.x = tw->dir.y;
+	tw->driverParent->rotCurr.y = tw->dir.y;
 	if (tw->orbTimeAlive > 400) 
 	{
 		tw->driverParent->angle = tw->dir.y;

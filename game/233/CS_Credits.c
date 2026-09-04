@@ -469,7 +469,7 @@ void CS_Credits_DrawNames(struct CreditsObj *co)
 				colorSlot = CREDITS_FADE;
 
 				int fade8 = (fadeAmount << 8) / CS_CREDITS_LINE_HEIGHT;
-				char *src = (char *)data.ptrColor[charId];
+				char *src = (char *)Color_GetGradient(charId);
 				char *dst = (char *)&data.colors[CREDITS_FADE];
 
 				for (int i = 0; i < 4; i++)

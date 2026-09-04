@@ -424,30 +424,9 @@ void LOAD_RunPtrMap(char *origin, int *patchArr, int numPtrs)
 #if defined(CTR_NATIVE)
 #include <platform/native_assets.h>
 
-static void *LOAD_ReadLooseRacerModel(
-    int characterID)
+static struct Model *LOAD_ReadLooseModel(const char *path)
 {
-    const struct CharacterDef *character =
-        CharacterRegistry_GetByID(characterID);
-
-    if (character == NULL)
-        return NULL;
-
-    char path[128];
-
-    int pathLength = snprintf(
-        path,
-        sizeof(path),
-        "mods/racers/%s.ctr",
-        character->assetName);
-
-    if ((pathLength < 0) ||
-        ((u32)pathLength >= sizeof(path)))
-    {
-        return NULL;
-    }
-
-    struct NativeAssetsByteBuffer file;
+    struct NativeAssetsByteBuffer file = {0};
 
     if (!NativeAssets_ReadBytes(
             path,
@@ -457,34 +436,24 @@ static void *LOAD_ReadLooseRacerModel(
         return NULL;
     }
 
-    void *modelFile =
-        MEMPACK_AllocMem(file.size);
-
-    if (modelFile == NULL)
+    void *fileBase = MEMPACK_AllocMem(file.size);
+    if (fileBase == NULL)
     {
         NativeAssets_FreeBytes(&file);
         return NULL;
     }
 
-    memcpy(
-        modelFile,
-        file.data,
-        file.size);
-
+    memcpy(fileBase, file.data, file.size);
     NativeAssets_FreeBytes(&file);
 
-    int ptrMapOffset =
-        *(int *)modelFile;
-
+    int ptrMapOffset = *(int *)fileBase;
     char *modelData =
-        (char *)modelFile +
-        LOAD_MODEL_FILE_HEADER_BYTES;
+        (char *)fileBase + LOAD_MODEL_FILE_HEADER_BYTES;
 
     if (ptrMapOffset >= 0)
     {
         struct DramPointerMap *pointerMap =
-            (struct DramPointerMap *)
-                &modelData[ptrMapOffset];
+            (struct DramPointerMap *)&modelData[ptrMapOffset];
 
         LOAD_RunPtrMap(
             modelData,
@@ -493,7 +462,46 @@ static void *LOAD_ReadLooseRacerModel(
                 DRAM_POINTER_MAP_WORD_SHIFT);
     }
 
-    return modelData;
+    return (struct Model *)modelData;
+}
+
+static void *LOAD_ReadLooseRacerModel(int characterID)
+{
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(characterID);
+    char path[128];
+    int pathLength;
+
+    if (character == NULL)
+        return NULL;
+
+    pathLength = snprintf(
+        path,
+        sizeof(path),
+        "mods/racers/%s.ctr",
+        character->assetName);
+
+    if ((pathLength < 0) || ((u32)pathLength >= sizeof(path)))
+        return NULL;
+
+    return LOAD_ReadLooseModel(path);
+}
+
+static struct Model *sLooseRelicModel;
+
+void LOAD_LoadLooseStaticModels(void)
+{
+    sLooseRelicModel =
+        LOAD_ReadLooseModel("mods/models/relic.ctr");
+}
+
+void LOAD_ApplyLooseStaticModels(struct GameTracker *gGT)
+{
+    if (sLooseRelicModel != NULL)
+    {
+        gGT->modelPtr[STATIC_RELIC] =
+            sLooseRelicModel;
+    }
 }
 #endif
 

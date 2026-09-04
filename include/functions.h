@@ -23,6 +23,8 @@ void LOAD_FinalizeLooseRacerModels(void);
 void LOAD_ClearLooseRacerModels(void);
 void LOAD_LoadAllLooseRacerModels(void);
 void LOAD_ApplyLooseRacerIcons(struct GameTracker *gGT);
+void LOAD_LoadLooseStaticModels(void);
+void LOAD_ApplyLooseStaticModels(struct GameTracker *gGT);
 
 void BOTS_Adv_AdjustDifficulty(void);
 void BOTS_UpdateGlobals(void);
@@ -82,6 +84,7 @@ void CTR_Box_DrawSolidBox(RECT *r, Color color, u32 *ot);
 
 // decal
 u32 DecalFont_boolRacingWheel(void);
+u32 *Color_GetGradient(int colorID);
 void DecalFont_DrawLine(char *str, s16 posX, s16 posY, s16 fontType, s16 flags);
 void DecalFont_DrawLineStrlen(char *str, s16 len, int posX, s16 posY, s16 fontType, int flags);
 int DecalFont_DrawMultiLine(char *str, int posX, int posY, int maxPixLen, s16 fontType, int flags);
@@ -1097,6 +1100,7 @@ void CS_Cutscene_Start(void);
 void CS_LoadBossCallback(struct LoadQueueSlot *lqs);
 void CS_Camera_ThTick_Boss(struct Thread *t);
 b32 CS_Camera_BoolGotoBoss(void);
+void CS_Camera_ThTick_PodiumSkip(struct Thread *th);
 void CS_Camera_ThTick_Podium(struct Thread *th);
 void CS_OVR233_InitData(void);
 char *CS_OVR233_TranslateRetailOpcodePointer(char *opCodeAt);
@@ -1122,6 +1126,7 @@ void CS_Podium_Prize_Init(u32 prizeModel, const char *prizeName, const SVec3Slot
 void CS_Podium_Stand_ThTick(struct Thread *t);
 void CS_Podium_Stand_Init(struct CsThreadInitData *podiumData);
 void CS_Podium_FullScene_Init(void);
+void CS_Podium_SkipScene_Init(void);
 void CS_DestroyPodium_StartDriving(void);
 void CS_Credits_Init(void);
 char *CS_Credits_GetNextString(char *str);

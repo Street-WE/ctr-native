@@ -65,6 +65,9 @@ void LOAD_Hub_SwapNow()
 	if (level1 != 0)
 	{
 		LibraryOfModels_Store(gGT, level1->numModels, level1->ptrModelsPtrArray);
+#if defined(CTR_NATIVE)
+		LOAD_ApplyLooseStaticModels(gGT);
+#endif
 
 		INSTANCE_LevInitAll(level1->ptrInstDefs, level1->numInstances);
 
@@ -72,7 +75,6 @@ void LOAD_Hub_SwapNow()
 
 		DecalGlobal_Store(gGT, level1->levTexLookup);
 	}
-
 	MEMPACK_SwapPacks(gGT->activeMempackIndex);
 	MainInit_VisMem(gGT);
 
