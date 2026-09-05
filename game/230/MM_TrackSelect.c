@@ -108,14 +108,14 @@ static void MM_TrackSelect_BuildNativeArcadeTracks(void)
 	}
 }
 
-static struct MainMenu_LevelRow *MM_TrackSelect_GetNativeArcadeTracks(s16 *count)
+struct MainMenu_LevelRow *MM_TrackSelect_GetNativeArcadeTracks(s16 *count)
 {
 	MM_TrackSelect_BuildNativeArcadeTracks();
 	*count = s_nativeArcadeTrackCount;
 	return s_nativeArcadeTracks;
 }
 
-static const struct LevelDef *MM_TrackSelect_GetNativeLevelDef(int row)
+const struct LevelDef *MM_TrackSelect_GetNativeLevelDef(int row)
 {
 	if ((row < 0) || (row >= s_nativeArcadeTrackCount))
 		return NULL;

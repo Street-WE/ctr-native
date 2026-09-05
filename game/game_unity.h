@@ -108,6 +108,7 @@
 #include "CharacterRegistry.c"
 #include "CharacterIconCache.c"
 #include "LevelRegistry.c"
+#include "HighScoreRegistry.c"
 #include "LOAD/LOAD_Queue.c"
 #include "LOAD/LOAD_Hub.c"
 #include "LOAD/LOAD_Overlays.c"

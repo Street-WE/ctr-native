@@ -1,5 +1,6 @@
 #include <common.h>
 #include <CharacterRegistry.h>
+#include <HighScoreRegistry.h>
 
 internal s16 Ghost_LerpRot12(s16 curr, s16 next, u16 t)
 {
@@ -356,7 +357,7 @@ void GhostReplay_Init1(void)
 		}
 		else
 		{
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
 			struct SpawnType1 *spawnType1 = gGT->level1->ptrSpawnType1;
 			gh = NULL;
 
@@ -484,7 +485,7 @@ void GhostReplay_Init2(void)
 				continue;
 			}
 
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
 			if ((timeTrialFlags & TT_NTROPY_OPEN) == 0)
 			{
 				continue;
@@ -505,7 +506,7 @@ void GhostReplay_Init2(void)
 		s32 characterIndex = ghostID + 1;
 		if (ghostID != 0)
 		{
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
 			if ((timeTrialFlags & TT_NTROPY_BEATEN) != 0)
 			{
 				characterIndex = ghostID + 2;

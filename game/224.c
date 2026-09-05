@@ -1,4 +1,6 @@
 #include <common.h>
+#include <HighScoreRegistry.h>
+#include <CharacterIconCache.h>
 
 enum TimeTrialEndMenuConstants
 {
@@ -316,7 +318,8 @@ void TT_EndEvent_DrawHighScore(s16 startX, int startY, s16 scoreMode)
 	u16 rowOffsetY = 0;
 
 	// 12 entries per track, 6 for Time Trial and 6 for Relic Race
-	struct HighScoreEntry *scoreEntries = &sdata->gameProgress.highScoreTracks[gGT->levelID].scoreEntry[TT_HIGH_SCORE_ENTRIES_PER_MODE * scoreMode];
+	struct HighScoreEntry *scoreEntries = &HighScoreRegistry_GetActive()->scoreEntry[TT_HIGH_SCORE_ENTRIES_PER_MODE * scoreMode];
+	CharacterIconCache_LoadHighScores(gGT, scoreEntries, NULL);
 
 	// === Naughty Dog Bug ===
 	// Start and End is the same
@@ -335,7 +338,7 @@ void TT_EndEvent_DrawHighScore(s16 startX, int startY, s16 scoreMode)
 
 		// default color, not flashing
 		timeColor = 0;
-		s16 nameColor = scoreEntries[scoreEntryIndex].characterID + TT_HIGH_SCORE_DRIVER_COLOR_OFFSET;
+		s16 nameColor = CharacterIconCache_GetNameColor(scoreEntries[scoreEntryIndex].characterID);
 
 		// If this loop index is a new high score
 		if (gGT->newHighScoreIndex == rowIndex)
@@ -356,7 +359,7 @@ void TT_EndEvent_DrawHighScore(s16 startX, int startY, s16 scoreMode)
 		DecalFont_DrawLine((char *)&s_rankString224, startX - 0x32, timeboxY - 1, FONT_SMALL, WHITE);
 
 		// Draw Character Icon
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[data.MetaDataCharacters[scoreEntries[scoreEntryIndex].characterID].iconID], startX - 0x52, timeboxY,
+		RECTMENU_DrawPolyGT4(CharacterIconCache_GetHighScore(scoreEntries[scoreEntryIndex].characterID), startX - 0x52, timeboxY,
 		                     &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT,
 		                     // color of each corner
 		                     TT_HIGH_SCORE_ICON_COLOR, TT_HIGH_SCORE_ICON_COLOR, TT_HIGH_SCORE_ICON_COLOR, TT_HIGH_SCORE_ICON_COLOR,

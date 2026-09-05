@@ -6,6 +6,12 @@
 #include <platform/native_checkpoint.h>
 #endif
 
+enum
+{
+    LOOSE_RELIC_SCALE_NUMERATOR = 4,
+    LOOSE_RELIC_SCALE_DENOMINATOR = 6,
+};
+
 static const u8 sTrackRosters[NITRO_COURT][LOAD_CHARACTER_ID_COUNT] =
 {
 	[CRASH_COVE] = {
@@ -493,6 +499,22 @@ void LOAD_LoadLooseStaticModels(void)
 {
     sLooseRelicModel =
         LOAD_ReadLooseModel("mods/models/relic.ctr");
+
+    if (sLooseRelicModel != NULL)
+    {
+        for (int i = 0; i < sLooseRelicModel->numHeaders; i++)
+        {
+            struct ModelHeader *header =
+                &sLooseRelicModel->headers[i];
+
+            header->scale.x =
+                (header->scale.x * LOOSE_RELIC_SCALE_NUMERATOR) / LOOSE_RELIC_SCALE_DENOMINATOR;
+            header->scale.y =
+                (header->scale.y * LOOSE_RELIC_SCALE_NUMERATOR) / LOOSE_RELIC_SCALE_DENOMINATOR;
+            header->scale.z =
+                (header->scale.z * LOOSE_RELIC_SCALE_NUMERATOR) / LOOSE_RELIC_SCALE_DENOMINATOR;
+        }
+    }
 }
 
 void LOAD_ApplyLooseStaticModels(struct GameTracker *gGT)

@@ -1,4 +1,6 @@
 #include <common.h>
+#include <HighScoreRegistry.h>
+#include <LevelRegistry.h>
 
 void MainGameEnd_SoloRaceGetReward(int subtractTimeCrateBonus)
 {
@@ -50,6 +52,8 @@ void MainGameEnd_SoloRaceGetReward(int subtractTimeCrateBonus)
 		return;
 	}
 
+	const struct LevelDef *activeLevel = LevelRegistry_GetActive();
+	if (activeLevel != NULL && activeLevel->replaceLevelID < 0 && activeLevel->baseLevelID == gGT->levelID) return;
 	gGT->gameModeEnd |= 4;
 
 	struct HighScoreTrack *track = &sdata->gameProgress.highScoreTracks[gGT->levelID];
@@ -126,6 +130,7 @@ void MainGameEnd_SoloRaceSaveHighScore(void)
 
 	if (highScoreIndex < 0)
 	{
+		HighScoreRegistry_SaveActive();
 		return;
 	}
 
@@ -140,6 +145,7 @@ void MainGameEnd_SoloRaceSaveHighScore(void)
 	entry->name[0] = 0;
 	entry->characterID = data.characterIDs[(u8)player->driverID];
 	memmove(entry->name, gGT->prevNameEntered, 0x11);
+	HighScoreRegistry_SaveActive();
 }
 
 

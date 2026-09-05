@@ -1373,4 +1373,8 @@ int VehPhysGeneral_JumpGetVelY(s16 *normalVec, Vec3 *speedXYZ);
 void VehPhysGeneral_JumpAndFriction(struct Thread *thread, struct Driver *driver);
 void CS_LoadBoss(const struct BossCutsceneData *bcd);
 
+struct LevelDef;
+struct MainMenu_LevelRow *MM_TrackSelect_GetNativeArcadeTracks(s16 *count);
+const struct LevelDef *MM_TrackSelect_GetNativeLevelDef(int row);
+
 #endif
