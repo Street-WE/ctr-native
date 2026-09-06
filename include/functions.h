@@ -713,10 +713,9 @@ void UI_Lerp2D_HUD(s16 *ptrPos, s16 startX, s16 startY, s16 endX, s16 endY, int 
 
 void UI_RaceEnd_MenuProc(struct RectMenu *);
 
-// VEH
 void VehBirth_TeleportSelf(struct Driver *d, u8 spawnFlag, int spawnPosY);
 void VehBirth_TeleportAll(struct GameTracker *gGT, u32 spawnFlags);
-struct Model *VehBirth_GetModelByName(char *searchName);
+struct Model *VehBirth_GetModelByName(char const *searchName);
 void VehBirth_SetConsts(struct Driver *driver);
 void VehBirth_EngineAudio_AllPlayers(void);
 void VehBirth_TireSprites(struct Thread *t);
@@ -849,7 +848,7 @@ void MM_MenuProc_NewLoad(struct RectMenu *menu);
 struct RectMenu *MM_AdvNewLoad_GetMenuPtr(void);
 void MM_Characters_AnimateColors(u8 *colorData, s16 playerID, s16 flag);
 int MM_Characters_GetNextDriver(s16 direction, s16 characterID);
-b32 MM_Characters_boolIsInvalid(s16 *globalIconPerPlayer, s16 characterID, s16 player);
+b32 MM_Characters_boolIsInvalid(s16 characterID, s16 player);
 struct Model *MM_Characters_GetModelByName(const char *name);
 void MM_Characters_DrawWindows(b32 boolShowDrivers);
 void MM_Characters_SetMenuLayout(void);

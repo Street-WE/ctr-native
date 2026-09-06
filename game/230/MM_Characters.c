@@ -262,7 +262,7 @@ int MM_Characters_GetNextDriver(s16 direction, s16 characterID)
 
 // used for preventing players highlighting the same character
 // also for when you go left of komodo joe's icon
-b32 MM_Characters_boolIsInvalid(s16 *iconPerPlayer, s16 characterID, s16 player)
+b32 MM_Characters_boolIsInvalid(s16 characterID, s16 player)
 {
 	// if there are players
 	if (sdata->gGT->numPlyrNextGame)

@@ -18,11 +18,11 @@ struct HighScoreTrack *HighScoreRegistry_Get(int levelID, const struct LevelDef 
     if (level == NULL || level->replaceLevelID >= 0)
         return &sdata->gameProgress.highScoreTracks[levelID];
 
-    for (int i = 0; i < len(sAdditionalHighScores); i++)
+    for (unsigned int i = 0; i < len(sAdditionalHighScores); i++)
         if (strcmp(sAdditionalHighScores[i].id, level->id) == 0)
             return &sAdditionalHighScores[i].track;
 
-    for (int i = 0; i < len(sAdditionalHighScores); i++)
+    for (unsigned int i = 0; i < len(sAdditionalHighScores); i++)
     {
         struct AdditionalHighScores *scores = &sAdditionalHighScores[i];
         if (scores->id[0] != 0) continue;
@@ -69,7 +69,7 @@ void HighScoreRegistry_SaveActive(void)
     const struct LevelDef *level = LevelRegistry_GetActive();
     if (level == NULL || level->replaceLevelID >= 0 ||
         level->baseLevelID != sdata->gGT->levelID) return;
-    for (int i = 0; i < len(sAdditionalHighScores); i++)
+    for (unsigned int i = 0; i < len(sAdditionalHighScores); i++)
     {
         if (strcmp(sAdditionalHighScores[i].id, level->id) != 0) continue;
         if (NativeMemcard_WriteSaveData(sAdditionalHighScoreFiles[i], "", 0,

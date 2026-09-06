@@ -75,9 +75,6 @@ void DecalFont_DrawLineStrlen(char *str, s16 len, int posX, s16 posY, s16 fontTy
 		posX -= alignX;
 	}
 
-	int colorID;
-	colorID = flags & 0xfff;
-
 	flags &= 0xfff;
 
 

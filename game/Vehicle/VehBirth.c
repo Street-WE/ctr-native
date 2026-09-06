@@ -502,7 +502,7 @@ internal b32 VehBirth_ModelNameEquals(const struct Model *model, const char *nam
 	return true;
 }
 
-struct Model *VehBirth_GetModelByName(char *searchName)
+struct Model *VehBirth_GetModelByName(char const *searchName)
 {
 	// array to character models loaded,
 	// maximum of 4, used in VS mode
