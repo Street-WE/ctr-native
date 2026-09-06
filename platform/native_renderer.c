@@ -1517,6 +1517,38 @@ internal void NativeRenderer_DestroyTexture(TextureID texture)
 	glDeleteTextures(1, &texture);
 }
 
+// Standalone menu images retain their original resolution and color depth.
+TextureID NativeRenderer_CreateImageTexture(const u8 *rgba, int width, int height)
+{
+	GLint maxSize;
+	TextureID texture = 0;
+	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
+	if (width <= 0 || height <= 0 || width > maxSize || height > maxSize)
+		return 0;
+	glGenTextures(1, &texture);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+	s_lastBoundTexture = (TextureID)-1;
+	return texture;
+}
+
+void NativeRenderer_ReleaseImageTexture(TextureID texture)
+{
+	if (texture != 0)
+		NativeRenderer_DestroyTexture(texture);
+	s_lastBoundTexture = (TextureID)-1;
+}
+
+float NativeRenderer_GetPixelAspect(int width, int height)
+{
+	if (width <= 0 || height <= 0) return 1.0f;
+	return ((float)s_presentAspectW * height) / ((float)s_presentAspectH * width);
+}
 internal u16 NativeRenderer_PackRGB24ToPSX15(u8 r, u8 g, u8 b)
 {
 	return (u16)(((r >> 3) & 0x1f) | (((g >> 3) & 0x1f) << 5) | (((b >> 3) & 0x1f) << 10));

@@ -13,7 +13,7 @@ struct CharacterDef
     s16 id;
     s16 driverPackCharacterID;
 
-    char assetName[MODEL_NAME_BYTE_COUNT];;
+    char assetName[MODEL_NAME_BYTE_COUNT];
     const char *displayName;
     const char *shortName;
 

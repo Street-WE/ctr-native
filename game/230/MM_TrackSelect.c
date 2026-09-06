@@ -178,7 +178,110 @@ void MM_TrackSelect_Video_State(b32 resetPreview)
 
 #ifdef CTR_NATIVE
 #include <platform/native_str.h>
+#include <platform/native_assets.h>
+#include <platform/native_renderer.h>
+#ifndef STBI_INCLUDE_STB_IMAGE_H
+#include "../../externals/SDL/src/video/stb_image.h"
+#endif
 
+// Cache only the selected image, including failed lookups. Re-entering the
+// screen invalidates the cache so edits to previews are picked up.
+static const struct LevelDef *s_previewLevel;
+static int s_previewChecked;
+static int s_previewValid;
+static TextureID s_previewTexture;
+static int s_previewWidth, s_previewHeight;
+
+static int MM_TrackSelect_LoadPNG(const struct LevelDef *level)
+{
+	struct NativeAssetsByteBuffer file;
+	char path[LEVEL_REGISTRY_PATH_LENGTH];
+	int width, height, channels;
+	unsigned char *rgba;
+	if (s_previewChecked && s_previewLevel == level)
+		return s_previewValid;
+	NativeRenderer_ReleaseImageTexture(s_previewTexture);
+	s_previewTexture = 0;
+	s_previewChecked = 1;
+	s_previewLevel = level;
+	s_previewValid = 0;
+	if (level == NULL || snprintf(path, sizeof(path), "%s/menu/preview.png", level->assetName) >= sizeof(path))
+		return 0;
+	if (!NativeAssets_ReadBytes(path, NATIVE_ASSET_READ_DATA_FILE, &file))
+		return 0;
+	rgba = stbi_load_from_memory(file.data, file.size, &width, &height, &channels, 4);
+	NativeAssets_FreeBytes(&file);
+	if (rgba == NULL)
+		return 0;
+
+	// Composite transparent pixels over black; the native image pass is opaque.
+	for (size_t i = 0; i < (size_t)width * height; i++)
+		for (int channel = 0; channel < 3; channel++)
+			rgba[i * 4 + channel] = rgba[i * 4 + channel] * rgba[i * 4 + 3] / 255;
+	s_previewTexture = NativeRenderer_CreateImageTexture(rgba, width, height);
+	s_previewWidth = width;
+	s_previewHeight = height;
+	stbi_image_free(rgba);
+	s_previewValid = s_previewTexture != 0;
+	return s_previewValid;
+}
+
+static void MM_TrackSelect_DrawPNG(RECT *bounds)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	float pixelAspect = NativeRenderer_GetPixelAspect(
+		gGT->backBuffer->dispEnv.disp.w, gGT->backBuffer->dispEnv.disp.h);
+	float aspect = (float)s_previewWidth / s_previewHeight / pixelAspect;
+	int width = bounds->w - 6;
+	int height = (int)(width / aspect);
+	if (height > bounds->h - 4)
+	{
+		height = bounds->h - 4;
+		width = (int)(height * aspect);
+	}
+	if (width < 1) width = 1;
+	if (height < 1) height = 1;
+	int x = bounds->x + (bounds->w - width) / 2;
+	int y = bounds->y + (bounds->h - height) / 2;
+	// Texture override brackets the quad in the ordering table, so other UI
+	// primitives continue sampling PSX VRAM. UVs address a virtual 256px image.
+	DR_PSYX_TEX *begin = (DR_PSYX_TEX *)gGT->backBuffer->primMem.cursor;
+	POLY_FT4 *quad = (POLY_FT4 *)(begin + 1);
+	DR_PSYX_TEX *end = (DR_PSYX_TEX *)(quad + 1);
+	begin->code[0] = 0xb1000000 | s_previewTexture;
+	begin->code[1] = 256 | (256 << 16);
+	end->code[0] = 0xb1000000;
+	end->code[1] = 0;
+	setlen(begin, 2);
+	setlen(end, 2);
+	setPolyFT4(quad);
+	setShadeTex(quad, 1);
+	setXY4(quad, x, y, x + width, y, x, y + height, x + width, y + height);
+	setUV4(quad, 0, 0, 255, 0, 0, 255, 255, 255);
+	quad->tpage = 0;
+	quad->clut = 0;
+	addPrim(gGT->pushBuffer_UI.ptrOT, end);
+	addPrim(gGT->pushBuffer_UI.ptrOT, quad);
+	addPrim(gGT->pushBuffer_UI.ptrOT, begin);
+	gGT->backBuffer->primMem.cursor = end + 1;
+}
+
+static void MM_TrackSelect_DrawRightArrow(int x, int y)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	// The font maps ">" to a dash. Mirror the rendered "<" glyph locally.
+	POLY_GT4 *quad = (POLY_GT4 *)gGT->backBuffer->primMem.cursor;
+	DecalFont_DrawLine("<", x, y, FONT_BIG, JUSTIFY_CENTER | ORANGE);
+	if (gGT->backBuffer->primMem.cursor != quad)
+	{
+		u8 left = quad->u0;
+		quad->u0 = quad->u1;
+		quad->u1 = left;
+		left = quad->u2;
+		quad->u2 = quad->u3;
+		quad->u3 = left;
+	}
+}
 static void MM_TrackSelect_Video_DrawNativePreview(RECT *r, int srcX, int srcY)
 {
 	struct GameTracker *gGT = sdata->gGT;
@@ -193,8 +296,8 @@ static void MM_TrackSelect_Video_DrawNativePreview(RECT *r, int srcX, int srcY)
 	        .srcH = MM_TRACK_VIDEO_FRAME_HEIGHT,
 	        .dstX = (s16)(r->x + MM_TRACK_VIDEO_FRAME_SRC_OFFSET_X),
 	        .dstY = (s16)(r->y + MM_TRACK_VIDEO_FRAME_SRC_OFFSET_Y),
-	        .dstW = MM_TRACK_VIDEO_FRAME_WIDTH,
-	        .dstH = MM_TRACK_VIDEO_FRAME_HEIGHT,
+	        .dstW = (s16)(r->w - 6),
+	        .dstH = (s16)(r->h - 4),
 	    },
 	};
 
@@ -216,6 +319,22 @@ void MM_TrackSelect_Video_Draw(RECT *r, struct MainMenu_LevelRow *selectMenu, in
 
 	selectMenu = &selectMenu[trackIndex];
 	s32 previewVideoFileIndex = selectMenu->previewVideoFileIndex;
+#ifdef CTR_NATIVE
+	if ((gGT->gameMode1 & BATTLE_MODE) == 0)
+	{
+		const struct LevelDef *level = MM_TrackSelect_GetNativeLevelDef(trackIndex);
+		if (level == NULL)
+			level = LevelRegistry_GetReplacement(selectMenu->levID);
+		if (MM_TrackSelect_LoadPNG(level))
+		{
+			NativeSTR_Stop();
+			MM_TrackSelect_Video_SetDefaults();
+			MM_TrackSelect_DrawPNG(r);
+			RECTMENU_DrawInnerRect(r, (s16)(rectFlags | 1), gGT->backBuffer->otMem.uiOT);
+			return;
+		}
+	}
+#endif
 
 	if ((entry[previewVideoFileIndex].size == 0) ||
 
@@ -319,7 +438,7 @@ void MM_TrackSelect_Video_Draw(RECT *r, struct MainMenu_LevelRow *selectMenu, in
 		// Draw Video icon
 		RECTMENU_DrawPolyGT4(gGT->ptrIcons[selectMenu->videoThumbnail], (r->x + MM_TRACK_VIDEO_FRAME_SRC_OFFSET_X), (r->y + MM_TRACK_VIDEO_FRAME_SRC_OFFSET_Y),
 		                     &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT, ColorCode_GetPacked(&D230.videoCol), ColorCode_GetPacked(&D230.videoCol),
-		                     ColorCode_GetPacked(&D230.videoCol), ColorCode_GetPacked(&D230.videoCol), 0, FP(1.0));
+		                     ColorCode_GetPacked(&D230.videoCol), ColorCode_GetPacked(&D230.videoCol), 0, FP(1.0) * (r->w - 6) / MM_TRACK_VIDEO_FRAME_WIDTH);
 	}
 
 #ifndef CTR_NATIVE
@@ -402,6 +521,11 @@ b32 MM_TrackSelect_boolTrackOpen(struct MainMenu_LevelRow *menuSelect)
 
 void MM_TrackSelect_Init(void)
 {
+#ifdef CTR_NATIVE
+	s_previewChecked = 0;
+	NativeRenderer_ReleaseImageTexture(s_previewTexture);
+	s_previewTexture = 0;
+#endif
 	struct MainMenu_LevelRow *selectMenu = D230.arcadeTracks;
 	s16 numTracks = MM_TRACK_SELECT_ARCADE_TRACK_COUNT;
 
@@ -493,6 +617,11 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 
 			if (elapsedFrames > MM_TRACK_SELECT_TRANSITION_FRAMES)
 			{
+#ifdef CTR_NATIVE
+				NativeRenderer_ReleaseImageTexture(s_previewTexture);
+				s_previewTexture = 0;
+				s_previewChecked = 0;
+#endif
 				sdata->errorMessagePosIndex = 0;
 
 				// if track has not been chosen
@@ -579,7 +708,17 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 	// if lap selection menu is closed
 	if (D230.trackSelect.lapBoxOpen == 0)
 	{
-		int importantButton = sdata->buttonTapPerPlayer[0] & MM_TRACK_SELECT_INPUT;
+		int input = sdata->buttonTapPerPlayer[0];
+#ifdef CTR_NATIVE
+		if ((gGT->gameMode1 & BATTLE_MODE) == 0)
+		{
+			int horizontal = input & (BTN_LEFT | BTN_RIGHT);
+			input &= ~(BTN_UP | BTN_DOWN | BTN_LEFT | BTN_RIGHT);
+			if (horizontal == BTN_LEFT) input |= BTN_UP;
+			if (horizontal == BTN_RIGHT) input |= BTN_DOWN;
+		}
+#endif
+		int importantButton = input & MM_TRACK_SELECT_INPUT;
 
 		if (
 		    // if not changing levels
@@ -753,6 +892,45 @@ void MM_TrackSelect_MenuProc(struct RectMenu *menu)
 #if defined(CTR_NATIVE)
 	if ((gGT->gameMode1 & BATTLE_MODE) == 0)
 		LevelRegistry_SetActive(MM_TrackSelect_GetNativeLevelDef(menu->rowSelected));
+#endif
+#ifdef CTR_NATIVE
+	if ((gGT->gameMode1 & BATTLE_MODE) == 0)
+	{
+		int selected = D230.trackSelect.currentTrack;
+		int levelID = selectMenu[selected].levID;
+		const struct LevelDef *level = MM_TrackSelect_GetNativeLevelDef(selected);
+		const struct LevelDef *namedLevel = level != NULL ? level : LevelRegistry_GetReplacement(levelID);
+		char *name = namedLevel != NULL ? (char *)namedLevel->name : sdata->lngStrings[data.metaDataLEV[levelID].name_LNG];
+		int offsetX = D230.trackTransitions.named.trackSelect_previewTransition.currX;
+		int offsetY = D230.trackTransitions.named.trackSelect_previewTransition.currY;
+		int font = DecalFont_GetLineWidth(name, FONT_BIG) > 420 ? FONT_SMALL : FONT_BIG;
+		RECT preview = {83 + offsetX, 43 + offsetY, 346, 146};
+		DecalFont_DrawLine(name, 256 + offsetX, 14 + offsetY, font, JUSTIFY_CENTER | ORANGE);
+		if (!D230.trackSelect.lapBoxOpen)
+		{
+			DecalFont_DrawLine("<", 32 + offsetX, 14 + offsetY, FONT_BIG, JUSTIFY_CENTER | ORANGE);
+			MM_TrackSelect_DrawRightArrow(480 + offsetX, 14 + offsetY);
+		}
+		if ((gGT->gameMode1 & TIME_TRIAL) && level == NULL)
+		{
+			int timeTrialFlags = sdata->gameProgress.highScoreTracks[levelID].timeTrialFlags;
+			for (int star = 0; star < MM_TRACK_SELECT_TT_STAR_COUNT; star++)
+				if ((timeTrialFlags >> D230.timeTrialStars.beatenFlagBit[star]) & 1)
+				{
+					u32 *color = data.ptrColor[D230.timeTrialStars.colorIndex[star]];
+					struct Icon **icons = ICONGROUP_GETICONS(gGT->iconGroup[MM_TRACK_SELECT_TT_STAR_ICON_GROUP]);
+					DecalHUD_DrawPolyGT4(icons[MM_TRACK_SELECT_TT_STAR_ICON], 438 + star * 12 + offsetX, 193 + offsetY,
+						&gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT,
+						color[0], color[1], color[2], color[3], 0, FP(1.0));
+				}
+			if (RefreshCard_CountGhostProfilesForLEV(levelID) != 0)
+				DecalFont_DrawLine(sdata->lngStrings[LNG_GHOST_DATA_EXISTS], 256 + offsetX, 193 + offsetY,
+					FONT_SMALL, JUSTIFY_CENTER | ((sdata->frameCounter & 4) ? PERIWINKLE : WHITE));
+		}
+		MM_TrackSelect_Video_Draw(&preview, selectMenu, selected,
+			D230.trackSelect.transition.state == EXITING_MENU, 0);
+		return;
+	}
 #endif
 	s32 scanTrack = (int)menu->rowSelected + -1;
 
