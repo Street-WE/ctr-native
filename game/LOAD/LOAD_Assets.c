@@ -762,6 +762,10 @@ int LOAD_DriverMPK(struct BigHeader *bigfile, int levelLOD, void (*callback)(str
 		    (gGT->levelID == ADVENTURE_GARAGE))
 		{
 			lastFileIndexMPK = BI_ADVENTUREPACK + CharacterRegistry_GetDriverPackID(data.characterIDs[0]);
+			// The Adventure pack only contains retail racers. Load the selected
+			// registry model as well, just as the racing paths do.
+			if ((gameMode1 & ADVENTURE_ARENA) != 0)
+				LOAD_LoadLooseRacerModels(1);
 			goto QueueLastPack;
 		}
 

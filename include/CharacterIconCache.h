@@ -28,4 +28,7 @@ void CharacterIconCache_LoadHighScores(struct GameTracker *gGT,
 struct Icon *CharacterIconCache_GetHighScore(int characterID);
 int CharacterIconCache_GetNameColor(int characterID);
 
+struct Icon *CharacterIconCache_GetAdventureProfile(
+    struct GameTracker *gGT, int characterID, int profileSlot);
+
 #endif

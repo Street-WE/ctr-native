@@ -142,6 +142,26 @@ int CharacterIconCache_GetNameColor(int characterID)
     return character != NULL ? character->minimapColor : WHITE;
 }
 
+struct Icon *CharacterIconCache_GetAdventureProfile(
+    struct GameTracker *gGT, int characterID, int profileSlot)
+{
+    if ((u32)profileSlot >= MEMCARD_ADV_PROFILE_COUNT || characterID < 0)
+        return NULL;
+
+    // Keep the first eight texture slots intact for the race/hub HUD.
+    struct CharacterIconCacheSlot *cached = &sHighScoreIcons[8 + profileSlot];
+    if (cached->characterID != characterID)
+    {
+        struct Icon *icon = gGT->ptrIcons[data.MetaDataCharacters[8 + profileSlot].iconID];
+        const struct CharacterDef *character = CharacterRegistry_GetByID(characterID);
+        cached->characterID = characterID;
+        cached->icon = NULL;
+        if (character != NULL && LOAD_ApplyLooseRacerIcon(icon, character->assetName))
+            cached->icon = icon;
+    }
+    return cached->icon;
+}
+
 struct Icon *CharacterIconCache_GetHighScore(int characterID)
 {
     for (int slot = 0; slot < 16; slot++)

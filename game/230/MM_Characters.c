@@ -785,11 +785,24 @@ void MM_Characters_MenuProc(struct RectMenu *unused)
 			if (D230.characterSelectExitsForward == 0)
 			{
 				MM_JumpTo_Title_Returning();
+				if ((gGT->gameMode1 & ADVENTURE_MODE) != 0)
+					D230.menuAdventure.state &= ~ONLY_DRAW_TITLE;
 				MM_Characters_HideDrivers();
 				return;
 			}
 
 			MM_Characters_HideDrivers();
+
+#ifdef CTR_NATIVE
+			if ((gGT->gameMode1 & ADVENTURE_MODE) != 0)
+			{
+				sdata->advProgress.characterID = data.characterIDs[0];
+				SubmitName_RestoreName(0);
+				NikoGetEnterKey();
+				sdata->ptrDesiredMenu = &data.menuSubmitName;
+				return;
+			}
+#endif
 
 			// if you are in a cup
 			if ((gGT->gameMode2 & CUP_ANY_KIND) != 0)
