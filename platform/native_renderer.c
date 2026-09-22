@@ -13,6 +13,7 @@
 #include "platform/native_log.h"
 #include "platform/native_perf.h"
 #include "platform/native_renderer.h"
+#include "platform/native_obj.h"
 
 #include <assert.h>
 #include <string.h>
@@ -62,6 +63,10 @@ global_variable b32 s_gpuTimerActive;
 #endif
 
 global_variable BlendMode s_previousBlendMode = BM_NONE;
+/* Host images carry real alpha; framebuffer textures carry PS1 mask bits. */
+struct NativeImageTexture { TextureID id; struct NativeImageTexture *next; };
+static struct NativeImageTexture *s_imageTextures;
+static GLint s_imageAlphaCutoutLoc = -1;
 global_variable int s_previousDepthMode = 0;
 global_variable int s_previousStencilMode = 0;
 global_variable int s_previousScissorState = 0;
@@ -270,6 +275,7 @@ int NativeRenderer_InitialiseRender(char *windowName, int width, int height, int
 
 void NativeRenderer_Shutdown(void)
 {
+	NativeObj_Shutdown();
 	glDeleteVertexArrays(2, s_glVertexArray);
 	glDeleteBuffers(2, s_glVertexBuffer);
 
@@ -858,11 +864,13 @@ const char *gte_shader_4 = GPU_FRAGMENT_SAMPLE_SHADER(4);
 const char *gte_shader_8 = GPU_FRAGMENT_SAMPLE_SHADER(8);
 const char *gte_shader_16 = GPU_FRAGMENT_SAMPLE_SHADER(16);
 const char *gte_shader_32_rgba = "	uniform sampler2D s_texture;\n"
+                                 "	uniform int imageAlphaCutout;\n"
                                  "	uniform int psxDrawMaskSet;\n"
                                  "	uniform vec2 texelSize;\n"
                                  "	void main() {\n"
                                  "		vec2 tc = v_texcoord.xy * texelSize + texelSize * 0.5;\n"
                                  "		vec4 color = texture2D(s_texture, tc);\n"
+                                 "		if (imageAlphaCutout != 0 && color.a < 0.5) { discard; }\n"
                                  "		fragColor = dither(color * v_color);\n"
                                  "		fragColor.a = float(psxDrawMaskSet);\n"
                                  "	}\n";
@@ -1080,6 +1088,7 @@ internal void NativeRenderer_InitialisePSXShaders(void)
 	NativeRenderer_CompilePSXShader(&s_gteShader8, gte_shader_8);
 	NativeRenderer_CompilePSXShader(&s_gteShader16, gte_shader_16);
 	NativeRenderer_CompilePSXShader(&s_gteShader32Rgba, gte_shader_32_rgba);
+	s_imageAlphaCutoutLoc = glGetUniformLocation(s_gteShader32Rgba.shader, "imageAlphaCutout");
 }
 
 // NOTE(aalhendi): GPU VRAM pack. Samples an RGBA render texture and writes PS1
@@ -1450,6 +1459,13 @@ void NativeRenderer_SetTexture(TextureID texture, TexFormat texFormat)
 	{
 		texture = s_whiteTexture;
 	}
+	if (texFormat == TF_32_BIT_RGBA && s_imageAlphaCutoutLoc >= 0)
+	{
+		int isImage = 0;
+		for (struct NativeImageTexture *image = s_imageTextures; image; image = image->next)
+			if (image->id == texture) { isImage = 1; break; }
+		glUniform1i(s_imageAlphaCutoutLoc, isImage);
+	}
 
 	// NOTE(penta3): s_texture (unit 0) and s_rgLut (unit 1) sampler bindings are baked
 	// into each program at compile time (NativeRenderer_Shader_Compile) and uniform
@@ -1525,7 +1541,13 @@ TextureID NativeRenderer_CreateImageTexture(const u8 *rgba, int width, int heigh
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxSize);
 	if (width <= 0 || height <= 0 || width > maxSize || height > maxSize)
 		return 0;
+	struct NativeImageTexture *image = SDL_malloc(sizeof(*image));
+	if (!image) return 0;
 	glGenTextures(1, &texture);
+	if (!texture) { SDL_free(image); return 0; }
+	image->id = texture;
+	image->next = s_imageTextures;
+	s_imageTextures = image;
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -1539,6 +1561,12 @@ TextureID NativeRenderer_CreateImageTexture(const u8 *rgba, int width, int heigh
 
 void NativeRenderer_ReleaseImageTexture(TextureID texture)
 {
+	struct NativeImageTexture **link = &s_imageTextures;
+	while (*link) {
+		struct NativeImageTexture *image = *link;
+		if (image->id == texture) { *link = image->next; SDL_free(image); break; }
+		link = &image->next;
+	}
 	if (texture != 0)
 		NativeRenderer_DestroyTexture(texture);
 	s_lastBoundTexture = (TextureID)-1;

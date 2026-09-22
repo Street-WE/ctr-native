@@ -429,6 +429,7 @@ void LOAD_RunPtrMap(char *origin, int *patchArr, int numPtrs)
 
 #if defined(CTR_NATIVE)
 #include <platform/native_assets.h>
+#include <platform/native_obj.h>
 
 static struct Model *LOAD_ReadLooseModel(const char *path)
 {
@@ -480,6 +481,10 @@ static void *LOAD_ReadLooseRacerModel(int characterID)
 
     if (character == NULL)
         return NULL;
+
+    struct Model *objModel = NativeObj_LoadRacer(character->assetName);
+    if (objModel != NULL)
+        return objModel;
 
     pathLength = snprintf(
         path,

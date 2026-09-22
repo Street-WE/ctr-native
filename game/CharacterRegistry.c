@@ -30,7 +30,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .displayName = "Sam Sinister",
         .shortName = "Sinister",
         .engineClass = SPEED,
-        .minimapColor = ORANGE_RED,
+        .minimapColor = ORANGE_DARKENED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
     },
     [COCO_BANDICOOT] = {

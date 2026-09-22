@@ -1,6 +1,7 @@
 #include <common.h>
 
 #if defined(CTR_NATIVE)
+#include <platform/native_obj.h>
 static void MainFrame_RegisterGpuLinkRanges(struct GameTracker *gGT)
 {
 	static const char *const primLabels[2] = {"db0 prim", "db1 prim"};
@@ -343,6 +344,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 
 #if defined(CTR_NATIVE)
 		BOTS_UpdateGlobals();
+		NativeObj_UpdateWheels();
 #endif
 		GhostTape_WriteMoves(0);
 		gGT->unk1cc4[4] = (u32)(gGT->unk1cc4[4] * 10000) / 0x147e;
