@@ -217,6 +217,7 @@
 #include "Vehicle/VehBirth.c"
 #include "Vehicle/VehCalc.c"
 #include "Vehicle/VehAfterColl.c"
+#include "Vehicle/VehExhaust.c"
 #include "Vehicle/VehEmitter.c"
 #include "Vehicle/VehFire.c"
 #include "Vehicle/VehFrame.c"

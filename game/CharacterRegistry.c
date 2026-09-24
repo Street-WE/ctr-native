@@ -12,6 +12,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = FOREST_GREEN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [NEO_CORTEX] = {
         .id = NEO_CORTEX,
@@ -22,6 +23,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_RED_BLUE_GRADIENT,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = HIGH_EXHAUST,
     },
     [TINY_TIGER] = {
         .id = TINY_TIGER,
@@ -32,6 +34,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = ORANGE_DARKENED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [COCO_BANDICOOT] = {
         .id = COCO_BANDICOOT,
@@ -42,6 +45,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = ACCEL,
         .minimapColor = COCO_MAGENTA,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [N_GIN] = {
         .id = N_GIN,
@@ -52,6 +56,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = ACCEL,
         .minimapColor = DINGODILE_OLIVE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [DINGODILE] = {
         .id = DINGODILE,
@@ -62,6 +67,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = POLAR_CYAN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [POLAR] = {
         .id = POLAR,
@@ -72,6 +78,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = PENTA_WHITE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [PURA] = {
         .id = PURA,
@@ -82,6 +89,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_KING_GOLD,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [PINSTRIPE] = {
         .id = PINSTRIPE,
@@ -92,6 +100,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = EXT_COLOR_JOHNNY_BROWN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = V_HIGH_EXHAUST,
     },
     [PAPU_PAPU] = {
         .id = PAPU_PAPU,
@@ -102,6 +111,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = TINY_GREEN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [RIPPER_ROO] = {
         .id = RIPPER_ROO,
@@ -112,6 +122,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = PLAYER_YELLOW,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = RED_BEARD,
     },
     [KOMODO_JOE] = {
         .id = KOMODO_JOE,
@@ -122,6 +133,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_BASIL_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = SINGLE_BASIL,
     },
     [N_TROPY] = {
         .id = N_TROPY,
@@ -132,6 +144,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = TROPY_LIGHT_BLUE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [PENTA_PENGUIN] = {
         .id = PENTA_PENGUIN,
@@ -142,6 +155,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_BARON_TAN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [FAKE_CRASH] = {
         .id = FAKE_CRASH,
@@ -152,6 +166,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = ACCEL,
         .minimapColor = JOE_COLOR,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [NITROS_OXIDE] = {
         .id = NITROS_OXIDE,
@@ -162,6 +177,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = PINSTRIPE_PALE_DARK_BLUE,
         .flags = 0,
+        .exhaustType = GYPSY_MOTH,
     },
     [X_BKNIGHT] = {
         .id = X_BKNIGHT,
@@ -172,6 +188,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_KNIGHT_BLACK,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_GAIL] = {
         .id = X_GAIL,
@@ -182,6 +199,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = EXT_COLOR_GAIL_GREEN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_HAWKINS] = {
         .id = X_HAWKINS,
@@ -192,6 +210,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = ROO_ORANGE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_ROBO] = {
         .id = X_ROBO,
@@ -202,6 +221,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = ACCEL,
         .minimapColor = LIME_GREEN,
         .flags = 0,
+        .exhaustType = ROBO_RACER,
     },
     [X_ACHU] = {
         .id = X_ACHU,
@@ -212,6 +232,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = EXT_COLOR_GOLD_GRADIENT,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_TURBOC] = {
         .id = X_TURBOC,
@@ -222,6 +243,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_TURBO_GRN_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_ADMIRAL] = {
         .id = X_ADMIRAL,
@@ -232,6 +254,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_ADMIRAL_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_ALPHA] = {
         .id = X_ALPHA,
@@ -242,6 +265,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_ALPHA_GRN,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_ISLANDER] = {
         .id = X_ISLANDER,
@@ -252,6 +276,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_ISLANDER_ORANGE,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_JOAN] = {
         .id = X_JOAN,
@@ -262,6 +287,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = ACCEL,
         .minimapColor = BLUE,
         .flags = 0,
+        .exhaustType = PAIR_LOW,
     },
     [X_NOVA] = {
         .id = X_NOVA,
@@ -272,6 +298,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = EXT_COLOR_NOVA_GREY,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
     [X_SCOOTER] = {
         .id = X_SCOOTER,
@@ -282,6 +309,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .engineClass = BALANCED,
         .minimapColor = PLAYER_RED,
         .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .exhaustType = PAIR_LOW,
     },
 };
 
@@ -295,6 +323,17 @@ int CharacterRegistry_GetEngineClass(
         return BALANCED;
 
     return character->engineClass;
+}
+
+int CharacterRegistry_GetDriverExhaustType(int characterID)
+{
+    const struct CharacterDef *character =
+        CharacterRegistry_GetByID(characterID);
+
+    if (character == NULL)
+        return DEFAULT_EXHAUST;
+
+    return character->exhaustType;
 }
 
 int CharacterRegistry_GetDriverPackID(

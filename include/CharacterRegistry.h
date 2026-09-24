@@ -3,6 +3,18 @@
 
 #include <common.h>
 
+enum CharacterExhaustType
+{
+    DEFAULT_EXHAUST = 0,
+    PAIR_LOW,
+    SINGLE_BASIL,
+    HIGH_EXHAUST,
+    V_HIGH_EXHAUST,
+    RED_BEARD,
+    ROBO_RACER,
+    GYPSY_MOTH,
+};
+
 enum CharacterFlags
 {
     CHARACTER_FLAG_HAS_WHEELS = 1 << 0,
@@ -20,9 +32,12 @@ struct CharacterDef
     u8 engineClass;
     u8 minimapColor;
     u8 flags;
+    u8 exhaustType;
 };
 
 int CharacterRegistry_GetCount(void);
+
+int CharacterRegistry_GetDriverExhaustType(int characterID);
 
 int CharacterRegistry_GetDriverPackID(
     int characterID);

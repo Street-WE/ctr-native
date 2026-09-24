@@ -970,6 +970,10 @@ internal void NativeCheckpoint_RelocateTurbo(const struct NativeCheckpointHeader
 	};
 
 	NativeCheckpoint_RelocateFields(oldHeader, liveHeader, turbo, fields, len(fields));
+	for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS - 2; i++)
+	{
+		NativeCheckpoint_RelocatePointerSlot(oldHeader, liveHeader, &turbo->extraInst[i]);
+	}
 }
 
 internal void NativeCheckpoint_RelocateBlowupSlots(const struct NativeCheckpointHeader *oldHeader, const struct NativeCheckpointHeader *liveHeader, s32 *slots)
