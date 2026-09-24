@@ -1,4 +1,8 @@
 #include <common.h>
+#include <CharacterRegistry.h>
+#if defined(CTR_NATIVE)
+#include <LevelRegistry.h>
+#endif
 
 void Music_SetIntro(void)
 {
@@ -229,19 +233,27 @@ u32 Music_AsyncParseBanks(void)
 				// numPlyrCurrGame
 				if (sdata->bankCount < gGT->numPlyrCurrGame)
 				{
-					if (
-					    // if bank of 8 drivers is loaded
-					    (sdata->bankLoad54 != 0) &&
+					int characterID =
+						data.characterIDs[sdata->bankCount];
 
-					    // if characterID is part of original 8
-					    (data.characterIDs[sdata->bankCount] < PINSTRIPE))
+					int bankCharacterID =
+						CharacterRegistry_GetDriverPackID(
+							characterID);
+
+					if (
+						/*
+						 * The shared bank already contains the first
+						 * eight retail characters.
+						 */
+						(sdata->bankLoad54 != 0) &&
+						(bankCharacterID < PINSTRIPE))
 					{
-						// skip load bank
 						goto LAB_8002e178;
 					}
 
-					// load bank for character
-					index = data.characterIDs[sdata->bankCount] + 0x37;
+					index =
+						bankCharacterID + 0x37;
+
 					goto LOAD_BANK;
 				}
 			}
@@ -252,7 +264,9 @@ u32 Music_AsyncParseBanks(void)
 				// load 5 banks, one for each driver
 				if (sdata->bankCount < 5)
 				{
-					index = data.characterIDs[sdata->bankCount] + 0x37;
+					int characterID = data.characterIDs[sdata->bankCount];
+
+					index =	CharacterRegistry_GetDriverPackID(characterID) + 0x37;
 
 				LOAD_BANK:
 
@@ -270,16 +284,18 @@ u32 Music_AsyncParseBanks(void)
 		{
 			if (sdata->bankCount == 0)
 			{
-				if ((sdata->bankLoad54 != 0) ||
+				int bankCharacterID =
+					CharacterRegistry_GetDriverPackID(
+						data.characterIDs[0]);
 
-				    // characterID is special character
-				    (PURA < data.characterIDs[0]))
+				if ((sdata->bankLoad54 != 0) ||
+					(PURA < bankCharacterID))
 				{
 					goto LAB_8002e178;
 				}
 
-				// bank = characterID + 0x37
-				index = data.characterIDs[0] + 0x37;
+				index =
+					bankCharacterID + 0x37;
 
 				// load bank
 				goto LOAD_BANK;
@@ -436,6 +452,23 @@ void Music_Adjust(u32 songID, int newTempo, struct SongSet *set, u32 songSetActi
 {
 	songID &= 0xffff;
 
+#if defined(CTR_NATIVE)
+	/*
+	 * A loose WAV replaces CSEQ music for this level, but the HOWL bank
+	 * remains loaded so its sound effects are still available.
+	 */
+	if ((sdata->gGT != NULL) &&
+	    (LevelRegistry_GetMusic(sdata->gGT->levelID) != NULL))
+	{
+		if (sdata->cseqBoolPlay != 0)
+		{
+			CseqMusic_StopAll();
+			Music_End();
+		}
+		return;
+	}
+#endif
+
 	// if cseq music can play
 	if (sdata->cseqBoolPlay != 0)
 	{
@@ -486,6 +519,11 @@ void Music_LowerVolume(void)
 
 		CseqMusic_ChangeVolume(sdata->cseqHighestIndex & 0xffff, setVolume, 8);
 	}
+	#ifdef CTR_NATIVE
+	NativeAudio_SetMusicVolume(
+		(sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT) / 2,
+		(sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT) / 2);
+	#endif
 }
 
 // after "FINAL LAP!" is done
@@ -506,6 +544,11 @@ void Music_RaiseVolume(void)
 
 		CseqMusic_ChangeVolume(sdata->cseqHighestIndex & 0xffff, setVolume, 8);
 	}
+	#ifdef CTR_NATIVE
+	NativeAudio_SetMusicVolume(
+		sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT,
+		sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT);
+	#endif
 }
 
 void Music_Restart(void)

@@ -470,8 +470,18 @@ void SubmitName_MenuProc(struct RectMenu *menu)
 		if (selection < 0)
 		{
 			// Change active Menu back to Adv char select
-			sdata->ptrDesiredMenu = CS_Garage_GetMenuPtr();
-			CS_Garage_ZoomOut(1);
+#ifdef CTR_NATIVE
+			if (gGT->levelID == MAIN_MENU_LEVEL)
+			{
+				MM_JumpTo_Characters();
+				sdata->ptrDesiredMenu = sdata->ptrActiveMenu;
+			}
+			else
+#endif
+			{
+				sdata->ptrDesiredMenu = CS_Garage_GetMenuPtr();
+				CS_Garage_ZoomOut(1);
+			}
 		}
 		else
 		{

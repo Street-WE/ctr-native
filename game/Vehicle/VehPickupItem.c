@@ -444,6 +444,11 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 	int mineHitModel = 0;
 	int mineShouldInitFollower = 0;
 
+	if (RB_Warpball_IsDriverRiding(d))
+	{
+		return;
+	}
+
 	switch (weaponID)
 	{
 	// Turbo
@@ -1016,16 +1021,16 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 
 		PlaySound3D(SOUND_WARPBALL, weaponInst);
 
-		// if human and not AI (AIs can not use Warpball)
-		if ((d->actionsFlagSet & ACTION_BOT) == 0)
-		{
-			Voiceline_RequestPlay(VOICELINE_WARPBALL, data.characterIDs[d->driverID], VOICELINE_WEAPON_PRIORITY);
-		}
+		Voiceline_RequestPlay(VOICELINE_WARPBALL, data.characterIDs[d->driverID], VOICELINE_WEAPON_PRIORITY);
 
 		// used by RB_Warpball_SeekDriver
 		victim = 0;
 		int rank = d->driverRank;
-		if (rank != 0)
+		if (rank == 0)
+		{
+			victim = gGT->driversInRaceOrder[rank + 1];
+		}
+		else
 		{
 			victim = gGT->driversInRaceOrder[rank - 1];
 		}
@@ -1052,21 +1057,6 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 		tw->nodeNextIndex = tw->nodeCurrIndex;
 		tw->ptrNodeCurr = &cn[tw->nodeCurrIndex];
 
-		// make this driver invincible
-		tw->driversHit = 1 << d->driverID;
-
-		victim = 0;
-		if (rank != 0)
-		{
-			victim = RB_Warpball_GetDriverTarget(tw, weaponInst);
-		}
-		tw->driverTarget = victim;
-
-		if (victim != 0)
-		{
-			RB_Warpball_SetTargetDriver(tw);
-		}
-
 		if ((tw->flags & TRACKER_FLAG_WARPBALL_TARGET_PATH) == 0)
 		{
 			RB_Warpball_Start(tw);
@@ -1080,6 +1070,7 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 
 		tw->vel.y = 0;
 		tw->rotY = d->angle;
+		tw->dir.y = d->angle;
 		tw->parentSafetyFrames = WARPBALL_PARENT_SAFETY_FRAMES;
 
 		// do NOT patch for 60fps,
@@ -1138,6 +1129,11 @@ void VehPickupItem_ShootNow(struct Driver *d, s32 weaponID, s32 flags)
 void VehPickupItem_ShootOnCirclePress(struct Driver *d)
 {
 	u8 weapon;
+
+	if (RB_Warpball_IsDriverRiding(d))
+	{
+		return;
+	}
 
 	if (d->pendingDamageType != 0)
 	{

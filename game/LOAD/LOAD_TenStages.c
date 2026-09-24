@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterIconCache.h>
 
 void (*mainMenuInit[])() = {MM_JumpTo_Title_FirstTime, MM_JumpTo_Characters, MM_JumpTo_TrackSelect, MM_JumpTo_BattleSetup, CS_Garage_Init, MM_JumpTo_Scrapbook};
 
@@ -29,6 +30,53 @@ static void LOAD_NativeAudio_SetStateAfterBankReload(u32 state)
 }
 #endif
 
+#ifdef CTR_NATIVE
+#include <LevelRegistry.h>
+#include <platform/native_audio.h>
+
+static void LOAD_NativeMusic_StartForLevel(
+	struct GameTracker *gGT)
+{
+	const char *musicPath;
+	int volume;
+
+	NativeAudio_StopMusic();
+
+	if (gGT == NULL)
+	{
+		return;
+	}
+
+	musicPath =
+		LevelRegistry_GetMusic(gGT->levelID);
+
+	if (musicPath == NULL)
+	{
+		/* Keep the normal HOWL/CSEQ music. */
+		return;
+	}
+
+	/*
+	 * Prevent the original level song from playing underneath
+	 * the custom WAV.
+	 */
+	CseqMusic_StopAll();
+	Music_End();
+
+	/*
+	 * Native direct-volume values use the same shift as XA.
+	 */
+	volume =
+		sdata->vol_Music <<
+		CDSYS_XA_VOLUME_SHIFT;
+
+	NativeAudio_PlayMusicWav(
+		musicPath,
+		volume,
+		volume);
+}
+#endif
+
 int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *bigfile)
 {
 	int levelID;
@@ -50,6 +98,10 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 	{
 	case 0:
 	{
+		#ifdef CTR_NATIVE
+		NativeAudio_StopMusic();
+		#endif
+
 		if (!boolPlayMusicDuringLoading)
 		{
 			Cutscene_VolumeBackup();
@@ -59,15 +111,16 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// if first boot (SCEA + Copyright + ND Box)
 		if (sdata->boolFirstBoot != 0)
 		{
-			u32 vramSize;
+			//u32 vramSize;
 
 			sdata->boolFirstBoot = 0;
 
 			// Load Intro TIM for Copyright Page from VRAM file
-			LOAD_VramFile(bigfile, LOAD_FIRST_BOOT_COPYRIGHT_TIM_BIGFILE_INDEX, NULL, &vramSize, -1);
-			MainInit_VRAMDisplay();
+			//LOAD_VramFile(bigfile, LOAD_FIRST_BOOT_COPYRIGHT_TIM_BIGFILE_INDEX, NULL, &vramSize, -1);
+			//MainInit_VRAMDisplay();
 
 #ifdef CTR_NATIVE
+			#if 0
 			// NOTE(aalhendi): SCEA is already held by XA playback in MainMain. The copyright
 			// TIM has no XA, so keep it visible until the intro CSEQ reaches
 			// the point retail normally reaches while loading the ND crate.
@@ -78,6 +131,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 				VSync(0);
 				Platform_PresentVRAMDisplay();
 			}
+			#endif
 #endif
 
 			gGT->db[0].drawEnv.isbg = 0;
@@ -311,6 +365,11 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 			data.driverModelExtras[i].fileBase = NULL;
 		}
 
+		LOAD_ClearLooseRacerModels();
+#if defined(CTR_NATIVE)
+		LOAD_LoadLooseStaticModels();
+#endif
+
 		// NOTE(aalhendi): Retail gates stage advancement until the driver MPK callback sets ptrMPK.
 		sdata->load_inProgress = 1;
 		LOAD_DriverMPK(bigfile, sdata->levelLOD, LOAD_Callback_DriverModels);
@@ -328,6 +387,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		}
 
 		LOAD_GlobalModelPtrs_MPK();
+#if defined(CTR_NATIVE)
+		LOAD_ApplyLooseStaticModels(gGT);
+#endif
 		DecalGlobal_Clear(gGT);
 
 		gGT->mpkIcons = 0;
@@ -372,6 +434,8 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 				data.driverModelExtras[i].model = (struct Model *)((u8 *)data.driverModelExtras[i].fileBase + LOAD_MODEL_FILE_HEADER_BYTES);
 			}
 		}
+
+		LOAD_FinalizeLooseRacerModels();
 
 		// == banks are done parsing ===
 
@@ -468,7 +532,25 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 		if (lev != 0)
 		{
-			DecalGlobal_Store(gGT, lev->levTexLookup);
+			DecalGlobal_Store(
+				gGT,
+				lev->levTexLookup);
+
+			LOAD_ApplyLooseRacerIcons(gGT);
+
+			if (gGT->levelID == MAIN_MENU_LEVEL)
+{
+				/*
+				 * RestoreIDs may have populated the cache before the
+				 * returning menu level replaced its VRAM and CLUT data.
+				 */
+				MM_Characters_ReloadPageIcons();
+			}
+			else if ((gGT->gameMode1 & MAIN_MENU) == 0)
+			{
+				CharacterIconCache_LoadRaceCharacters(
+					gGT);
+			}
 		}
 
 		DebugFont_Init(gGT);
@@ -477,6 +559,9 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		if (lev != 0)
 		{
 			LibraryOfModels_Store(gGT, lev->numModels, lev->ptrModelsPtrArray);
+#if defined(CTR_NATIVE)
+			LOAD_ApplyLooseStaticModels(gGT);
+#endif
 
 			gGT->ptrCircle = (u32)DecalGlobal_FindInLEV(lev, rdata.s_circle);
 			gGT->ptrClod = (u32)DecalGlobal_FindInLEV(lev, rdata.s_clod);
@@ -509,7 +594,8 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		{
 			break;
 		}
-
+		/*
+		* Commented out to stop podiums from happening
 		// === Assume PodiumReward Active ===
 
 		// Set Pack of the hub you're NOT on
@@ -576,11 +662,14 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 		// Disable LEV instances on Adv Hub, for podium scene
 		gGT->gameMode2 = gGT->gameMode2 | NO_LEV_INSTANCE;
+		*/
 		break;
 	}
 	case 8:
 	{
 		// If going to the podium
+		/*
+		//Commented out relating to skipping podiums
 		if (((gGT->gameMode1 & ADVENTURE_ARENA) != 0) && (gGT->podiumRewardID != NOFUNC) // 0
 		)
 		{
@@ -611,6 +700,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 
 			MEMPACK_SwapPacks(gGT->activeMempackIndex);
 		}
+		*/
 
 		// Level ID
 		int currentLevelID = gGT->levelID;
@@ -623,6 +713,7 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		LAB_800346b0:
 #if defined(CTR_NATIVE)
 			LOAD_NativeAudio_SetStateAfterBankReload(audioState);
+			LOAD_NativeMusic_StartForLevel(gGT);
 #else
 			Audio_SetState_Safe(audioState);
 #endif
@@ -632,7 +723,13 @@ int LOAD_TenStages(struct GameTracker *gGT, int loadingStage, struct BigHeader *
 		// One of the maps on Adventure Arena
 		if ((u32)(currentLevelID - GEM_STONE_VALLEY) < LOAD_ADV_HUB_COUNT)
 		{
+			//Changed relating to skipping podiums
 			audioState = AUDIO_ADV_HUB_WAIT;
+
+			if (gGT->podiumRewardID == NOFUNC)
+			{
+				audioState = AUDIO_ADV_HUB;
+			}
 
 			// podium reward
 			if (gGT->podiumRewardID == NOFUNC) // 0

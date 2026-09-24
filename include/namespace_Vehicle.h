@@ -51,7 +51,20 @@ enum Characters
 	N_TROPY,
 	PENTA_PENGUIN,
 	FAKE_CRASH,
-	NITROS_OXIDE = 15
+	NITROS_OXIDE = 15,
+	X_BKNIGHT = 16,
+	X_GAIL,
+	X_HAWKINS,
+	X_ROBO,
+	X_ACHU,
+	X_TURBOC,
+	X_ADMIRAL,
+	X_ALPHA,
+	X_ISLANDER,
+	X_JOAN,
+	X_NOVA,
+	X_SCOOTER,
+	CHARACTER_ID_COUNT
 };
 
 enum KartState
@@ -701,6 +714,8 @@ struct MetaPhys
 };
 
 
+enum { VEH_EXHAUST_MAX_OUTLETS = 12 };
+
 struct Turbo
 {
 	struct Instance *inst;
@@ -736,6 +751,9 @@ struct Turbo
 	// Set to 96 (which makes fire invisible for 0.1 seconds, 96 / 1000 = 96ms = 0.1s) when obtaining turbo from certain sources, namely those from
 	// power-sliding (used to make fire pop with each power-slide)
 	s16 fireVisibilityCooldown;
+
+	// Native exhaust layouts can add outlets beyond the original pair.
+	struct Instance *extraInst[VEH_EXHAUST_MAX_OUTLETS - 2];
 };
 
 struct BotPhysics

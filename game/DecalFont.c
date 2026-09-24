@@ -75,7 +75,6 @@ void DecalFont_DrawLineStrlen(char *str, s16 len, int posX, s16 posY, s16 fontTy
 		posX -= alignX;
 	}
 
-
 	flags &= 0xfff;
 
 
@@ -89,7 +88,7 @@ void DecalFont_DrawLineStrlen(char *str, s16 len, int posX, s16 posY, s16 fontTy
 		s16 iconScale = FP(1.0);
 
 
-		u32 *ptrColor = data.ptrColor[flags];
+		u32 *ptrColor = Color_GetGradient(flags);
 
 
 		if (*strcopy == ':' || *strcopy == '.')
@@ -106,7 +105,7 @@ void DecalFont_DrawLineStrlen(char *str, s16 len, int posX, s16 posY, s16 fontTy
 			charWidth = data.font_charPixWidth[fontType] + data.font_buttonPixWidth[fontType];
 
 			// use neutral vertex color for button characters
-			ptrColor = data.ptrColor[GRAY];
+			ptrColor = Color_GetGradient(GRAY);
 		}
 
 		// Set character sprite (icon) IDs
@@ -333,4 +332,120 @@ int DecalFont_DrawMultiLineStrlen(char *str, s16 len, s16 posX, s16 posY, s16 ma
 int DecalFont_DrawMultiLine(char *str, int posX, int posY, int maxPixLen, s16 fontType, int flags)
 {
 	return (s16)DecalFont_DrawMultiLineStrlen(str, -1, (s16)posX, (s16)posY, (s16)maxPixLen, fontType, (s16)flags);
+}
+
+u32 extensionColors[NUM_EXTENSION_COLORS][4] =
+{
+	//Note for self, Gradients don't look good for minimap dot colours
+	//Paint/GIMP:  #RRGGBB
+	//CTR value:   0xBBGGRR
+
+	//Rocket Racer
+    [EXT_COLOR_RED_BLUE_GRADIENT - EXT_COLOR_FIRST] =
+    {
+        0xFF4800, 0xF6,
+        0xF6, 0xFF4800
+    },
+
+	//Royal King
+    [EXT_COLOR_KING_GOLD - EXT_COLOR_FIRST] =
+    {
+        0x459FC2, 0x459FC2,
+        0x459FC2, 0x459FC2
+    },
+
+	//Achu
+    [EXT_COLOR_GOLD_GRADIENT - EXT_COLOR_FIRST] =
+    {
+        0x02D0EB, 0x029CB0,
+        0x02D0EB, 0x029CB0
+    },
+
+	//Admiral
+    [EXT_COLOR_ADMIRAL_RED - EXT_COLOR_FIRST] =
+    {
+        0x1313B3, 0x1313B3,
+        0x1313B3, 0x1313B3
+    },
+
+	//Alpha
+    [EXT_COLOR_ALPHA_GRN - EXT_COLOR_FIRST] =
+    {
+        0x37CFC9, 0x37CFC9,
+        0x37CFC9, 0x37CFC9
+    },
+	
+	//Baron von Barron
+    [EXT_COLOR_BARON_TAN - EXT_COLOR_FIRST] =
+    {
+        0xA7E1E6, 0xA7E1E6,
+        0xA7E1E6, 0xA7E1E6
+    },
+
+	//Basil the Batlord
+    [EXT_COLOR_BASIL_RED - EXT_COLOR_FIRST] =
+    {
+        0x101090, 0x101090,
+        0x101090, 0x101090
+    },
+
+	//Black Knight
+    [EXT_COLOR_KNIGHT_BLACK - EXT_COLOR_FIRST] =
+    {
+        0x222222, 0x222222,
+        0x222222, 0x222222
+    },
+
+	//Gail Storm
+    [EXT_COLOR_GAIL_GREEN - EXT_COLOR_FIRST] =
+    {
+        0x21B821, 0x21B821,
+        0x21B821, 0x21B821
+    },
+
+	//Johnny Thunder
+    [EXT_COLOR_JOHNNY_BROWN - EXT_COLOR_FIRST] =
+    {
+        0x09204A, 0x09204A,
+        0x09204A, 0x09204A
+    },
+
+	//Islander
+    [EXT_COLOR_ISLANDER_ORANGE - EXT_COLOR_FIRST] =
+    {
+        0x0F2670, 0x0F2670,
+        0x0F2670, 0x0F2670
+    },
+
+	//Nova
+    [EXT_COLOR_NOVA_GREY - EXT_COLOR_FIRST] =
+    {
+        0x383C38, 0x383C38,
+        0x383C38, 0x383C38
+    },
+
+	//Turbo Charger
+    [EXT_COLOR_TURBO_GRN_RED - EXT_COLOR_FIRST] =
+    {
+        0x285818, 0x285818,
+        0x101090, 0x101090
+    },
+};
+
+u32 *Color_GetGradient(int colorID)
+{
+    if ((u32)colorID < NUM_COLORS)
+    {
+        return data.ptrColor[colorID];
+    }
+
+    colorID -= EXT_COLOR_FIRST;
+
+    if ((u32)colorID < NUM_EXTENSION_COLORS)
+    {
+        return extensionColors[colorID];
+    }
+
+    // Safe fallback for invalid IDs
+    return data.ptrColor[WHITE];
 }

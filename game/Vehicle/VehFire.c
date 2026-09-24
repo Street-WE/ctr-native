@@ -1,4 +1,5 @@
 #include <common.h>
+#include <VehExhaust.h>
 
 enum
 {
@@ -83,6 +84,28 @@ Skip:
 }
 
 
+static void VehFire_CreateFlames(struct Thread *turboThread, const struct ExhaustTemplate *layout)
+{
+	struct GameTracker *gGT = sdata->gGT;
+	struct Turbo *turboObj = turboThread->object;
+	for (int i = 1; i < VehExhaust_GetCount(layout); i++)
+	{
+		struct Instance *flame = INSTANCE_Birth3D(gGT->modelPtr[STATIC_TURBO_EFFECT],
+		    sdata->s_turbo2, turboThread);
+		if (i == 1) turboObj->inst = flame;
+		else turboObj->extraInst[i - 2] = flame;
+	}
+
+	u32 addFlags = (gGT->numPlyrCurrGame == 1) ? VISIBLE_DURING_GAMEPLAY : 0;
+	// Keep a hidden primary instance even for zero outlets: it owns
+	// the existing boost timing, audio and fade state.
+	for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS; i++)
+	{
+		struct Instance *flame = VehExhaust_GetFlame(turboThread, i);
+		if (flame != NULL) flame->flags |= addFlags | VEH_FIRE_INITIAL_INSTANCE_FLAGS;
+	}
+}
+
 // param1 - driver
 // param2 - reserves to add
 // param3 - add type
@@ -96,11 +119,9 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 	int newFireSize;
 	int oldOTT;
 
-	u32 addFlags;
 	struct Turbo *turboObj;
 	struct Thread *turboThread;
 	struct Instance *turboInst1;
-	struct Instance *turboInst2;
 
 	struct GameTracker *gGT = sdata->gGT;
 	if (
@@ -181,6 +202,7 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 
 			// get object, set essentials
 			turboObj = turboThread->object;
+			memset(turboObj, 0, sizeof(*turboObj));
 			turboObj->driver = driver;
 			turboObj->fireVisibilityCooldown = 0;
 
@@ -210,27 +232,8 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 
 			turboThread->funcThDestroy = VehTurbo_ThDestroy;
 
-			// turbo #2
-			turboInst2 = INSTANCE_Birth3D(gGT->modelPtr[STATIC_TURBO_EFFECT], // model
-			                              &sdata->s_turbo2[0],                // name
-			                              turboThread                         // parent thread
-			);
-
-			// 2P 3P 4P flags
-			addFlags = 0;
-
-			turboObj->inst = turboInst2;
-			turboObj->fireAnimIndex = 0;
-
-			// 1P flags
-			if (gGT->numPlyrCurrGame == 1)
-			{
-				addFlags = VISIBLE_DURING_GAMEPLAY;
-			}
-
-			// Initial fire instances are billboarded but hidden until the turbo tick reveals them.
-			turboInst1->flags = turboInst1->flags | addFlags | VEH_FIRE_INITIAL_INSTANCE_FLAGS;
-			turboInst2->flags = turboInst2->flags | addFlags | VEH_FIRE_INITIAL_INSTANCE_FLAGS;
+			VehFire_CreateFlames(turboThread,
+			    VehExhaust_GetTemplate(data.characterIDs[driver->driverID]));
 		}
 #else
 		turboObj = 0;
@@ -243,10 +246,6 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 	{
 		// get the turbo's object
 		turboObj = turboThread->object;
-
-		// get the turbo's instances
-		turboInst1 = turboThread->inst;
-		turboInst2 = turboObj->inst;
 
 		// remove "dead thread" flag
 		turboThread->flags &= ~THREAD_FLAG_DEAD;
@@ -266,16 +265,22 @@ void VehFire_Increment(struct Driver *driver, int reserves, u32 type, int fireLe
 		else
 		{
 			// make fire invisible for the sake of the visibility cooldown as explained in common.h
-			turboInst1->flags |= DEPTH_FADE | HIDE_MODEL;
-			turboInst2->flags |= DEPTH_FADE | HIDE_MODEL;
+			for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS; i++)
+			{
+				struct Instance *flame = VehExhaust_GetFlame(turboThread, i);
+				if (flame != NULL) flame->flags |= DEPTH_FADE | HIDE_MODEL;
+			}
 
 			turboObj->fireVisibilityCooldown = VEH_FIRE_VISIBILITY_COOLDOWN;
 			driver->numTurbos = (s16)CTR_MipsAddLo((u16)driver->numTurbos, 1);
 		}
 
 		turboObj->fireDisappearCountdown = VEH_FIRE_NO_DISAPPEAR;
-		turboInst1->alphaScale = 0;
-		turboInst2->alphaScale = 0;
+		for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS; i++)
+		{
+			struct Instance *flame = VehExhaust_GetFlame(turboThread, i);
+			if (flame != NULL) flame->alphaScale = 0;
+		}
 
 		// player of any kind
 		if (driver->instSelf->thread->modelIndex == DYNAMIC_PLAYER)

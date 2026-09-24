@@ -45,6 +45,8 @@ void MM_MenuProc_Main(struct RectMenu *mainMenu)
 {
 	struct GameTracker *gGT = sdata->gGT;
 
+	gGT->numPlyrNextGame = 1;
+
 	// if scrapbook is unlocked, change "rows" to extended array
 	if (CHECK_ADV_BIT(sdata->gameProgress.unlocks, GAME_UNLOCK_BIT_SCRAPBOOK))
 	{
@@ -53,7 +55,7 @@ void MM_MenuProc_Main(struct RectMenu *mainMenu)
 
 	MM_ParseCheatCodes();
 	MM_ToggleRows_Difficulty();
-	MM_ToggleRows_PlayerCount();
+	//MM_ToggleRows_PlayerCount();
 
 	// If you are at the highest hierarchy level of main menu
 	if (mainMenu->funcState == RECTMENU_FUNC_STATE_UPDATE)
@@ -70,8 +72,6 @@ void MM_MenuProc_Main(struct RectMenu *mainMenu)
 
 		if ((D230.menuMainMenu.state & DRAW_NEXT_MENU_IN_HIERARCHY) == 0)
 		{
-			gGT->numPlyrNextGame = 1;
-
 			// if no buttons pressed, check demo mode
 			if (sdata->gGamepads->anyoneHeldCurr == 0)
 			{
@@ -182,6 +182,41 @@ void MM_MenuProc_Main(struct RectMenu *mainMenu)
 		return;
 	}
 
+	// Versus
+	if (choose == LNG_VS)
+	{
+		choose = LNG_ARCADE;
+		/*
+		// DONT change, should only work in Arcade, and VS
+		if ((gGT->gameMode2 & CHEAT_ONELAP) != 0)
+		{
+			gGT->numLaps = MM_ONE_LAP_CHEAT_COUNT;
+		}
+
+		// next menu is choosing single+cup
+		mainMenu->ptrNextBox_InHierarchy = &D230.menuRaceType;
+		mainMenu->state |= DRAW_NEXT_MENU_IN_HIERARCHY;
+		return;
+		*/
+	}
+
+	// Battle
+	if (choose == LNG_BATTLE)
+	{
+		choose = LNG_ARCADE;
+		/*
+		D230.characterSelectTransitionState = EXITING_MENU;
+
+		// set game mode to Battle Mode
+		gGT->gameMode1 |= BATTLE_MODE;
+
+		// set next menu to 2P,3P,4P
+		mainMenu->ptrNextBox_InHierarchy = &D230.menuPlayers2P3P4P;
+		mainMenu->state |= DRAW_NEXT_MENU_IN_HIERARCHY;
+		return;
+		*/
+	}
+
 	// Arcade Mode
 	if (choose == LNG_ARCADE)
 	{
@@ -196,35 +231,6 @@ void MM_MenuProc_Main(struct RectMenu *mainMenu)
 
 		// set next menu
 		mainMenu->ptrNextBox_InHierarchy = &D230.menuRaceType;
-		mainMenu->state |= DRAW_NEXT_MENU_IN_HIERARCHY;
-		return;
-	}
-
-	// Versus
-	if (choose == LNG_VS)
-	{
-		// DONT change, should only work in Arcade, and VS
-		if ((gGT->gameMode2 & CHEAT_ONELAP) != 0)
-		{
-			gGT->numLaps = MM_ONE_LAP_CHEAT_COUNT;
-		}
-
-		// next menu is choosing single+cup
-		mainMenu->ptrNextBox_InHierarchy = &D230.menuRaceType;
-		mainMenu->state |= DRAW_NEXT_MENU_IN_HIERARCHY;
-		return;
-	}
-
-	// Battle
-	if (choose == LNG_BATTLE)
-	{
-		D230.characterSelectTransitionState = EXITING_MENU;
-
-		// set game mode to Battle Mode
-		gGT->gameMode1 |= BATTLE_MODE;
-
-		// set next menu to 2P,3P,4P
-		mainMenu->ptrNextBox_InHierarchy = &D230.menuPlayers2P3P4P;
 		mainMenu->state |= DRAW_NEXT_MENU_IN_HIERARCHY;
 		return;
 	}
@@ -464,8 +470,9 @@ void MM_MenuProc_SingleCup(struct RectMenu *menu)
 		// if mode is Arcade
 		if ((gGT->gameMode1 & ARCADE_MODE) != 0)
 		{
-			// set next menu to 1P+2P select
-			menu->ptrNextBox_InHierarchy = &D230.menuPlayers1P2P;
+			// set next menu to 1P+2P select (Changed to go straight to difficulty)
+			gGT->numPlyrNextGame = 1;
+			menu->ptrNextBox_InHierarchy = &D230.menuDifficulty;
 			D230.characterSelectTransitionState = IN_MENU;
 			return;
 		}

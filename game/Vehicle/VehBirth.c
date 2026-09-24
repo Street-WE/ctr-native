@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 enum
 {
@@ -501,7 +502,7 @@ internal b32 VehBirth_ModelNameEquals(const struct Model *model, const char *nam
 	return true;
 }
 
-struct Model *VehBirth_GetModelByName(char *searchName)
+struct Model *VehBirth_GetModelByName(char const *searchName)
 {
 	// array to character models loaded,
 	// maximum of 4, used in VS mode
@@ -513,6 +514,21 @@ struct Model *VehBirth_GetModelByName(char *searchName)
 		{
 			// character found, return pointer
 			return m;
+		}
+	}
+
+	struct Model **looseModels = LOAD_GetLooseRacerModelList();
+
+	if ((looseModels != NULL) && (looseModels[0] != NULL))
+	{
+		for (int i = 0; looseModels[i] != NULL; i++)
+		{
+			struct Model *m = looseModels[i];
+
+			if (VehBirth_ModelNameEquals(m, searchName))
+			{
+				return m;
+			}
 		}
 	}
 
@@ -541,7 +557,7 @@ void VehBirth_SetConsts(struct Driver *driver)
 {
 	u8 *d = (u8 *)driver;
 
-	int engineID = data.MetaDataCharacters[data.characterIDs[driver->driverID]].engineID;
+	int engineID = CharacterRegistry_GetEngineClass(data.characterIDs[driver->driverID]);
 
 	for (u32 i = 0; i < VEH_BIRTH_META_PHYS_COUNT; i++)
 	{
@@ -587,7 +603,7 @@ void VehBirth_EngineAudio_AllPlayers(void)
 
 		u8 driverID = d->driverID;
 
-		int engine = data.MetaDataCharacters[data.characterIDs[driverID]].engineID;
+		int engine = CharacterRegistry_GetEngineClass(data.characterIDs[driverID]);
 
 		EngineAudio_InitOnce((engine * 4) + driverID, HOWL_SFX_CENTER_NO_DISTORTION);
 	}
@@ -617,9 +633,7 @@ void VehBirth_TireSprites(struct Thread *t)
 	d->heldItemID = HELD_ITEM_NONE;
 	d->BattleHUD.teamID = driverID;
 
-	if (
-	    // if character ID is oxide
-	    (data.characterIDs[driverID] == NITROS_OXIDE) && (gGT->levelID != MAIN_MENU_LEVEL))
+	if (!CharacterRegistry_HasWheels(data.characterIDs[driverID]))
 	{
 		d->wheelSize = 0;
 	}
@@ -664,7 +678,18 @@ void VehBirth_NonGhost(struct Thread *t, int index)
 		id = data.characterIDs[index];
 	}
 
-	struct Model *m = VehBirth_GetModelByName(data.MetaDataCharacters[id].name_Debug);
+	const struct CharacterDef *character =
+		CharacterRegistry_GetByID(id);
+
+	if (character == NULL)
+		return;
+
+	struct Model *m =
+		VehBirth_GetModelByName(
+			character->assetName);
+
+	if (m == NULL)
+		return;
 
 	struct Instance *inst = INSTANCE_Birth3D(m, m->name, t);
 

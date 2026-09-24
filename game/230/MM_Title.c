@@ -130,10 +130,17 @@ void MM_Title_MenuUpdate(void)
 
 		sdata->advProfileIndex = 0xffff;
 
+#ifdef CTR_NATIVE
+		gGT->numPlyrNextGame = 1;
+		gGT->gameMode2 &= ~(CUP_ANY_KIND | GARAGE_OSK);
+		sdata->ptrDesiredMenu = &D230.menuCharacterSelect;
+		MM_Characters_RestoreIDs();
+#else
 		// go to adventure character select screen
 		sdata->mainMenuState = MAIN_MENU_ADVENTURE;
 
 		MainRaceTrack_RequestLoad(ADVENTURE_GARAGE);
+#endif
 		break;
 
 	// adventure save/load

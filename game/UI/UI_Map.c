@@ -243,7 +243,7 @@ void UI_Map_DrawRawIcon(struct UIMap *map, const s32 worldPos[3], int iconID, in
 
 	UI_Map_GetIconPos(map, &posX, &posY);
 
-	ptrColor = data.ptrColor[colorID];
+	ptrColor = Color_GetGradient(colorID);
 
 	struct Icon **iconPtrArray = ICONGROUP_GETICONS(sdata->gGT->iconGroup[UI_MAP_ICON_GROUP]);
 
@@ -273,7 +273,14 @@ void UI_Map_DrawDrivers(struct UIMap *map, struct Thread *bucket, s16 *driverIco
 
 		// characterID + 5
 		// corresponds with ptrColors
-		kartColor = data.characterIDs[d->driverID] + 5;
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByID(
+				data.characterIDs[d->driverID]);
+
+		kartColor =
+			character != NULL
+				? character->minimapColor
+				: CRASH_BLUE;
 
 		// default (AI)
 		iconID = UI_MAP_PLAYER_ICON_AI;

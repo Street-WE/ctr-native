@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 u32 UI_VsQuipReadDriver(struct Driver *d, int offset, int size)
 {
@@ -483,17 +484,22 @@ void UI_VsQuipDrawAll(void)
 		// if the comment is conjoined
 		else
 		{
-			// Add two strings together
-			sprintf(printBuffer,
+			const struct CharacterDef *commentCharacter =
+				CharacterRegistry_GetByID(
+					d->EndOfRaceComment_characterID);
 
-			        // Contains '%s' format:
-			        // Original end-of-race comment
-			        sdata->lngStrings[printArr[0]],
+			const char *commentCharacterName = "Unknown";
 
-			        // second part of comment,
-			        // lngIndex of driver,
-			        // for stuff like "hit by Crash Bandicoot" or something
-			        sdata->lngStrings[data.MetaDataCharacters[d->EndOfRaceComment_characterID].name_LNG_long]);
+			if (commentCharacter != NULL)
+			{
+				commentCharacterName =
+					commentCharacter->displayName;
+			}
+
+			sprintf(
+				printBuffer,
+				sdata->lngStrings[printArr[0]],
+				commentCharacterName);
 
 			print = printBuffer;
 		}

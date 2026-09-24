@@ -970,6 +970,10 @@ internal void NativeCheckpoint_RelocateTurbo(const struct NativeCheckpointHeader
 	};
 
 	NativeCheckpoint_RelocateFields(oldHeader, liveHeader, turbo, fields, len(fields));
+	for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS - 2; i++)
+	{
+		NativeCheckpoint_RelocatePointerSlot(oldHeader, liveHeader, &turbo->extraInst[i]);
+	}
 }
 
 internal void NativeCheckpoint_RelocateBlowupSlots(const struct NativeCheckpointHeader *oldHeader, const struct NativeCheckpointHeader *liveHeader, s32 *slots)
@@ -1104,8 +1108,7 @@ internal void NativeCheckpoint_RelocateThreadObject(const struct NativeCheckpoin
 	{
 		NativeCheckpoint_RelocateMaskHeadWeapon(oldHeader, liveHeader, (struct MaskHeadWeapon *)thread->object);
 	}
-	else if ((thread->funcThTick == RB_MovingExplosive_ThTick) || (thread->funcThTick == RB_Warpball_ThTick) || (thread->funcThTick == RB_Warpball_FadeAway) ||
-	         (thread->funcThTick == RB_Warpball_TurnAround))
+	else if ((thread->funcThTick == RB_MovingExplosive_ThTick) || (thread->funcThTick == RB_Warpball_ThTick) || (thread->funcThTick == RB_Warpball_FadeAway))
 	{
 		NativeCheckpoint_RelocateTrackerWeapon(oldHeader, liveHeader, (struct TrackerWeapon *)thread->object);
 	}
