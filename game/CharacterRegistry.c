@@ -99,7 +99,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "J. Thunder",
         .engineClass = BALANCED,
         .minimapColor = EXT_COLOR_JOHNNY_BROWN,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = V_HIGH_EXHAUST,
     },
     [PAPU_PAPU] = {
@@ -154,7 +154,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "Barron",
         .engineClass = TURN,
         .minimapColor = EXT_COLOR_BARON_TAN,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = PAIR_LOW,
     },
     [FAKE_CRASH] = {

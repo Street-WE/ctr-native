@@ -83,5 +83,8 @@ before exporting and preserve object names. Materials and textures work as usual
 Wheel rotation follows distance travelled along the kart's forward axis and
 reverses when backing up. Sideways powerslide movement does not add rotation.
 It updates once per simulation frame for players and AI, including offscreen
-racers, and freezes with the game. Menu models stay still. This provides wheel
-spin only, without steering or suspension animation. Restart after editing assets.
+racers, and freezes with the game. Menu models stay still. The front wheels
+(`wheel_fl` and `wheel_fr`) also steer up to 10 degrees either way using the
+game's smoothed wheel-steering value, while continuing to spin around their
+turned axles. Rear wheels only spin. Suspension animation is not supported.
+Restart after editing assets.

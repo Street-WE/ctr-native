@@ -1,4 +1,7 @@
 #include <common.h>
+#ifdef CTR_NATIVE
+#include <platform/native_obj.h>
+#endif
 
 // To do: add a header
 
@@ -261,6 +264,11 @@ void UI_RenderFrame_Racing()
 					struct Icon **iconPtrArray = ICONGROUP_GETICONS(gGT->iconGroup[0xB]);
 
 					// "wumpaposter" icon group
+#ifdef CTR_NATIVE
+					if (!NativeObj_DrawWumpaIcon(iconPtrArray[0], wumpaModelPos.x, wumpaModelPos.y,
+					                           &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT,
+					                           hudStructPtr[UI_HUD_SLOT_WEAPON].scale))
+#endif
 					DecalHUD_DrawPolyFT4(iconPtrArray[0], (int)wumpaModelPos.x, (int)wumpaModelPos.y,
 
 					                     // pointer to PrimMem struct

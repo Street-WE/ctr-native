@@ -17,9 +17,16 @@ struct NativeObjMesh {
 };
 #define NATIVE_OBJ_MODEL_MAGIC 0x4f424a31
 struct Model *NativeObj_LoadRacer(const char *assetName);
+struct Model *NativeObj_LoadWumpaHUD(void);
+struct Icon;
+struct PrimMem;
+/* Returns zero when the original pickup icon should be drawn. */
+int NativeObj_DrawWumpaIcon(const struct Icon *original, short x, short y,
+                          struct PrimMem *primMem, unsigned int *ot, short scale);
 const struct NativeObjMesh *NativeObj_GetMesh(const struct Model *model);
 void NativeObj_Shutdown(void);
 void NativeObj_UpdateWheels(void);
-void NativeObj_GetWheelAngles(const struct Instance *inst, float angles[4]);
+/* Returns front-wheel steering in radians; angles receives axle spin. */
+float NativeObj_GetWheelAngles(const struct Instance *inst, float angles[4]);
 
 #endif

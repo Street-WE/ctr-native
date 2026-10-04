@@ -5090,7 +5090,8 @@ static int RenderBucket_RunInstanceSetupCallback(struct RenderBucketDrawContext 
 static void RenderBucket_DrawObj(struct RenderBucketDrawContext *ctx, const struct NativeObjMesh *mesh)
 {
     float angles[4], sine[4], cosine[4];
-    NativeObj_GetWheelAngles(ctx->inst, angles);
+    float steering = NativeObj_GetWheelAngles(ctx->inst, angles);
+    float steerSin = sinf(steering), steerCos = cosf(steering);
     for (int w = 0; w < 4; ++w) { sine[w] = sinf(angles[w]); cosine[w] = cosf(angles[w]); }
     const MATRIX *mvp = &ctx->idpp->mvp;
     /* OBJ counter-clockwise winding defines the outward geometric normal.
@@ -5109,16 +5110,24 @@ static void RenderBucket_DrawObj(struct RenderBucketDrawContext *ctx, const stru
         const struct NativeObjTriangle *t = &mesh->triangles[i];
         const struct NativeObjMaterial *m = &mesh->materials[t->material];
         for (int j = 0; j < 3; ++j) {
-            float y = t->v[j].p[1], z = t->v[j].p[2];
+            float x = t->v[j].p[0], y = t->v[j].p[1], z = t->v[j].p[2];
             int w = t->wheel;
-            if (w >= 0 && angles[w] != 0) {
+            if (w >= 0 && (angles[w] != 0 || (w < 2 && steering != 0))) {
                 const float *center = mesh->wheels[w].center;
+                float dx = x * mesh->extent[0] / 1016 - center[0];
                 float dy = y * mesh->extent[1] / 1016 - center[1];
                 float dz = z * mesh->extent[2] / 1016 - center[2];
                 y = (center[1] + dy * cosine[w] - dz * sine[w]) * 1016 / mesh->extent[1];
-                z = (center[2] + dy * sine[w] + dz * cosine[w]) * 1016 / mesh->extent[2];
+                float spunZ = dy * sine[w] + dz * cosine[w];
+                /* Spin about the local axle first, then steer the entire
+                 * front wheel about its centre in authored Y-up coordinates. */
+                if (w < 2) {
+                    x = (center[0] + dx * steerCos + spunZ * steerSin) * 1016 / mesh->extent[0];
+                    spunZ = spunZ * steerCos - dx * steerSin;
+                }
+                z = (center[2] + spunZ) * 1016 / mesh->extent[2];
             }
-            MTC2(RenderBucket_PackXY((s16)t->v[j].p[0], (s16)y), j * 2);
+            MTC2(RenderBucket_PackXY((s16)x, (s16)y), j * 2);
             MTC2((s16)z, j * 2 + 1);
         }
         gte_rtpt();

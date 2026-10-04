@@ -14,12 +14,15 @@
 #include <string.h>
 
 #define OBJ_LIMIT 100000
-struct NativeObjCache { char name[16]; struct NativeObjMesh mesh; struct NativeObjCache *next; };
+struct NativeObjCache { char name[16]; int hud; struct NativeObjMesh mesh; struct NativeObjCache *next; };
 static struct NativeObjCache *s_objCache;
+static unsigned int s_wumpaIcon;
+static int s_wumpaIconChecked;
 static struct ObjWheelState {
     const struct Instance *instance;
     const struct Model *model;
     float angles[4];
+    float steering;
     int position[3];
     unsigned int tick;
 } s_objWheels[8];
@@ -249,6 +252,17 @@ static int Obj_Read(struct NativeObjMesh *mesh, const char *dir, const char *fil
             lo[k] = fminf(lo[k], wheel->center[k] - wheel->radius);
             hi[k] = fmaxf(hi[k], wheel->center[k] + wheel->radius);
         }
+        if (w < 2) {
+            /* Conservative bounds for axle spin followed by up to 20 degrees
+             * of steering around Y, including the wheel's thickness. */
+            float halfWidth = (high[0] - low[0]) * 0.5f;
+            float reachX = halfWidth + wheel->radius * sinf(0.3490658504f);
+            float reachZ = wheel->radius + halfWidth * sinf(0.3490658504f);
+            lo[0] = fminf(lo[0], wheel->center[0] - reachX);
+            hi[0] = fmaxf(hi[0], wheel->center[0] + reachX);
+            lo[2] = fminf(lo[2], wheel->center[2] - reachZ);
+            hi[2] = fmaxf(hi[2], wheel->center[2] + reachZ);
+        }
     }
     for (int k = 0; k < 3; ++k) {
         mesh->extent[k] = fmaxf(hi[k] - lo[k], 0.001f);
@@ -265,11 +279,11 @@ static int Obj_Read(struct NativeObjMesh *mesh, const char *dir, const char *fil
     return 1;
 }
 
-static struct NativeObjCache *Obj_Find(const char *name)
+static struct NativeObjCache *Obj_Find(const char *name, int hud)
 {
-    for (struct NativeObjCache *c = s_objCache; c; c = c->next) if (!strcmp(c->name, name)) return c;
+    for (struct NativeObjCache *c = s_objCache; c; c = c->next) if (c->hud == hud && !strcmp(c->name, name)) return c;
     char dir[128], host[1024], filename[1024];
-    snprintf(dir, sizeof(dir), "mods/racers/%s", name);
+    snprintf(dir, sizeof(dir), hud ? "mods/models/%s" : "mods/racers/%s", name);
     if (!NativeAssets_BuildPath(dir, host, sizeof(host))) return NULL;
     int count = 0;
     char **files = SDL_GlobDirectory(host, "*.obj", SDL_GLOB_CASEINSENSITIVE, &count);
@@ -289,21 +303,22 @@ static struct NativeObjCache *Obj_Find(const char *name)
         Obj_Free(&c->mesh); free(c); return NULL;
     }
     snprintf(c->name, sizeof(c->name), "%s", name);
+    c->hud = hud;
     c->next = s_objCache; s_objCache = c;
     SDL_Log("OBJ racer %s: loaded %d triangles, %d materials", name, c->mesh.triangleCount, c->mesh.materialCount);
     return c;
 }
 
-struct Model *NativeObj_LoadRacer(const char *assetName)
+static struct Model *Obj_LoadModel(const char *assetName, int hud)
 {
-    struct NativeObjCache *c = Obj_Find(assetName);
+    struct NativeObjCache *c = Obj_Find(assetName, hud);
     if (!c) return NULL;
     struct ObjDescriptor { struct Model model; struct ModelHeader header; struct ModelFrame frame; };
     struct ObjDescriptor *d = MEMPACK_AllocMem(sizeof(*d));
     if (!d) return NULL;
     memset(d, 0, sizeof(*d));
     snprintf(d->model.name, sizeof(d->model.name), "%s", assetName);
-    d->model.id = -1; d->model.numHeaders = 1; d->model.headers = &d->header;
+    d->model.id = hud ? STATIC_FRUITDISP : -1; d->model.numHeaders = 1; d->model.headers = &d->header;
     snprintf(d->header.name, sizeof(d->header.name), "%s", assetName);
     d->header.unk1 = NATIVE_OBJ_MODEL_MAGIC;
     d->header.maxDistanceLOD = -1;
@@ -324,15 +339,101 @@ struct Model *NativeObj_LoadRacer(const char *assetName)
     return &d->model;
 }
 
+struct Model *NativeObj_LoadRacer(const char *assetName)
+{
+    return Obj_LoadModel(assetName, 0);
+}
+
+struct Model *NativeObj_LoadWumpaHUD(void)
+{
+    return Obj_LoadModel("wumpa", 1);
+}
+
+static unsigned int Obj_WumpaIcon(void)
+{
+    if (s_wumpaIconChecked) return s_wumpaIcon;
+    s_wumpaIconChecked = 1;
+    char path[1024];
+    if (!NativeAssets_ResolvePath("mods/models/wumpa/2d/icon.png", path, sizeof(path)) &&
+        !NativeAssets_ResolvePath("mods/models/wumpa/2d/wumpa.png", path, sizeof(path))) {
+        char host[1024], relative[1024];
+        if (!NativeAssets_BuildPath("mods/models/wumpa/2d", host, sizeof(host))) return 0;
+        int count = 0;
+        char **files = SDL_GlobDirectory(host, "*.png", SDL_GLOB_CASEINSENSITIVE, &count);
+        int found = 0;
+        if (files && count == 1) {
+            int n = snprintf(relative, sizeof(relative), "mods/models/wumpa/2d/%s", files[0]);
+            found = n > 0 && (size_t)n < sizeof(relative) && NativeAssets_ResolvePath(relative, path, sizeof(path));
+        }
+        SDL_free(files);
+        if (!found) return 0;
+    }
+    SDL_Surface *source = SDL_LoadPNG(path);
+    SDL_Surface *rgba = source ? SDL_ConvertSurface(source, SDL_PIXELFORMAT_RGBA32) : NULL;
+    if (source) SDL_DestroySurface(source);
+    if (!rgba) {
+        SDL_Log("Wumpa HUD: invalid pickup PNG; using CTR fallback");
+        return 0;
+    }
+    unsigned char *pixels = malloc((size_t)rgba->w * rgba->h * 4);
+    if (pixels) {
+        for (int y = 0; y < rgba->h; ++y)
+            memcpy(pixels + (size_t)y * rgba->w * 4, (char *)rgba->pixels + y * rgba->pitch, (size_t)rgba->w * 4);
+        s_wumpaIcon = NativeRenderer_CreateImageTexture(pixels, rgba->w, rgba->h);
+        free(pixels);
+    }
+    SDL_DestroySurface(rgba);
+    if (s_wumpaIcon) SDL_Log("Wumpa HUD: loaded pickup PNG %s", path);
+    return s_wumpaIcon;
+}
+
+int NativeObj_DrawWumpaIcon(const struct Icon *original, short x, short y,
+                          struct PrimMem *primMem, unsigned int *ot, short scale)
+{
+    unsigned int texture = Obj_WumpaIcon();
+    if (!texture || !original) return 0;
+    size_t bytes = 2 * sizeof(DR_PSYX_TEX) + sizeof(POLY_FT4);
+    /* An exhausted primitive buffer is handled, without drawing a fallback
+     * that would itself overrun the buffer. */
+    if ((char *)primMem->cursor + bytes >= (char *)primMem->guardEnd) return 1;
+    DR_PSYX_TEX *bind = primMem->cursor;
+    POLY_FT4 *p = (POLY_FT4 *)(bind + 1);
+    DR_PSYX_TEX *reset = (DR_PSYX_TEX *)(p + 1);
+    memset(bind, 0, bytes);
+    bind->code[0] = 0xb1000000 | (texture & 0xffffff);
+    bind->code[1] = 256 | (256 << 16);
+    reset->code[0] = 0xb1000000;
+    reset->code[1] = 256 | (256 << 16);
+    setlen(bind, 2);
+    setlen(reset, 2);
+    setPolyFT4(p);
+    setShadeTex(p, true);
+    int width = original->texLayout.u1 - original->texLayout.u0;
+    int height = original->texLayout.v2 - original->texLayout.v0;
+    int right = x + FP_Mult(width, scale);
+    int bottom = y + FP_Mult(height, scale);
+    setXY4CompilerHack(p, x, y, right, y, x, bottom, right, bottom);
+    setUV4(p, 0, 0, 255, 0, 0, 255, 255, 255);
+    /* The OT prepends packets: execute bind, image, reset. */
+    addPrim(ot, reset);
+    addPrim(ot, p);
+    addPrim(ot, bind);
+    primMem->cursor = (char *)bind + bytes;
+    return 1;
+}
+
 const struct NativeObjMesh *NativeObj_GetMesh(const struct Model *model)
 {
     if (!model || !model->headers || model->headers[0].unk1 != NATIVE_OBJ_MODEL_MAGIC) return NULL;
-    struct NativeObjCache *c = Obj_Find(model->name);
+    struct NativeObjCache *c = Obj_Find(model->name, model->id == STATIC_FRUITDISP);
     return c ? &c->mesh : NULL;
 }
 
 void NativeObj_Shutdown(void)
 {
+    NativeRenderer_ReleaseImageTexture(s_wumpaIcon);
+    s_wumpaIcon = 0;
+    s_wumpaIconChecked = 0;
     memset(s_objWheels, 0, sizeof(s_objWheels));
     while (s_objCache) { struct NativeObjCache *next = s_objCache->next; Obj_Free(&s_objCache->mesh); free(s_objCache); s_objCache = next; }
 }
@@ -371,16 +472,20 @@ void NativeObj_UpdateWheels(void)
             }
         } else memset(state->angles, 0, sizeof(state->angles));
         state->instance = d->instSelf; state->model = d->instSelf->model;
+        /* Retail wheelRotation is smoothed input in [-64, 64]. Match its
+         * steering direction, scaled to a ten-degree lock for OBJ wheels. */
+        state->steering = fmaxf(-1, fminf(1, d->wheelRotation / 64.0f)) * 0.3490658504f;
         state->tick = gt->timer;
         state->position[0] = d->posCurr.x; state->position[1] = d->posCurr.y; state->position[2] = d->posCurr.z;
     }
 }
 
-void NativeObj_GetWheelAngles(const struct Instance *inst, float angles[4])
+float NativeObj_GetWheelAngles(const struct Instance *inst, float angles[4])
 {
     memset(angles, 0, 4 * sizeof(*angles));
     for (int i = 0; i < 8; ++i)
         if (s_objWheels[i].instance == inst && s_objWheels[i].model == inst->model) {
-            memcpy(angles, s_objWheels[i].angles, sizeof(s_objWheels[i].angles)); return;
+            memcpy(angles, s_objWheels[i].angles, sizeof(s_objWheels[i].angles)); return s_objWheels[i].steering;
         }
+    return 0;
 }
