@@ -1134,6 +1134,14 @@ internal void NativeCheckpoint_RelocateThreadObject(const struct NativeCheckpoin
 	{
 		NativeCheckpoint_RelocateFollower(oldHeader, liveHeader, (struct Follower *)thread->object);
 	}
+	else if (thread->funcThTick == RB_SealTrail_ThTick)
+	{
+		struct SealTrail *trail = thread->object;
+		for (int i = 0; i < SEAL_TRAIL_GHOST_COUNT; i++)
+		{
+			NativeCheckpoint_RelocatePointerSlot(oldHeader, liveHeader, &trail->ghosts[i]);
+		}
+	}
 	else if (thread->funcThTick == RB_Fruit_ThTick)
 	{
 		NativeCheckpoint_RelocateFruit(oldHeader, liveHeader, (struct Fruit *)thread->object);

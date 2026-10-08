@@ -1,5 +1,120 @@
 #include <common.h>
+#include <math.h>
+#ifdef CTR_NATIVE
+#include <platform/native_audio.h>
+#endif
 
+enum
+{
+	SEAL_TRAIL_SAMPLE_INTERVAL = 2,
+	SEAL_TRAIL_ALPHA_START = 0x200,
+	SEAL_TRAIL_ALPHA_STEP = 0x180,
+	SEAL_TRAIL_FADE_STEP = 0x20,
+	SEAL_TRAIL_SCALE_STEP = 0x80,
+};
+
+static void RB_SealTrail_CopyPose(struct Instance *dst, const struct Instance *src)
+{
+	dst->model = src->model;
+	dst->matrix = src->matrix;
+	dst->animFrame = src->animFrame;
+	dst->animIndex = src->animIndex;
+	dst->flags = DRAW_INSTANCE | GHOST_DRAW_TRANSPARENT | (src->flags & HIDE_MODEL);
+}
+
+static void RB_SealTrail_ThDestroy(struct Thread *t)
+{
+	struct SealTrail *trail = t->object;
+	for (int i = 0; i < SEAL_TRAIL_GHOST_COUNT; i++)
+	{
+		if (trail->ghosts[i] != NULL)
+		{
+			INSTANCE_Death(trail->ghosts[i]);
+			trail->ghosts[i] = NULL;
+		}
+	}
+}
+
+void RB_SealTrail_ThTick(struct Thread *t)
+{
+	struct SealTrail *trail = t->object;
+	struct Instance *seal = t->parentThread != NULL ? t->parentThread->inst : NULL;
+	if (seal == NULL)
+	{
+		t->flags |= THREAD_FLAG_DEAD;
+		return;
+	}
+
+	// Children tick after their parent, including both movement and turning.
+	// Copy oldest first so each ghost retains the preceding sampled pose.
+	if ((trail->sampleTicks++ % SEAL_TRAIL_SAMPLE_INTERVAL) == 0)
+	{
+		for (int i = SEAL_TRAIL_GHOST_COUNT - 1; i >= 0; i--)
+		{
+			struct Instance *ghost = trail->ghosts[i];
+			const struct Instance *src = i == 0 ? seal : trail->ghosts[i - 1];
+			if (ghost != NULL && src != NULL)
+			{
+				RB_SealTrail_CopyPose(ghost, src);
+				ghost->alphaScale = SEAL_TRAIL_ALPHA_START + i * SEAL_TRAIL_ALPHA_STEP;
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < SEAL_TRAIL_GHOST_COUNT; i++)
+		{
+			if (trail->ghosts[i] != NULL)
+			{
+				trail->ghosts[i]->alphaScale += SEAL_TRAIL_FADE_STEP;
+			}
+		}
+	}
+
+	for (int i = 0; i < SEAL_TRAIL_GHOST_COUNT; i++)
+	{
+		struct Instance *ghost = trail->ghosts[i];
+		if (ghost == NULL)
+		{
+			continue;
+		}
+		ghost->scale.x = seal->scale.x + (i + 1) * SEAL_TRAIL_SCALE_STEP;
+		ghost->scale.y = seal->scale.y + (i + 1) * SEAL_TRAIL_SCALE_STEP;
+		ghost->scale.z = seal->scale.z + (i + 1) * SEAL_TRAIL_SCALE_STEP;
+		if ((seal->flags & HIDE_MODEL) != 0)
+		{
+			ghost->flags |= HIDE_MODEL;
+		}
+	}
+}
+
+static void RB_SealTrail_Init(struct Thread *sealThread)
+{
+	static const char ghostName[16] = "sealghost";
+	struct Thread *t = PROC_BirthWithObject(
+	    SIZE_RELATIVE_POOL_BUCKET(sizeof(struct SealTrail), CHILD_SIBLING, SMALL, STATIC),
+	    RB_SealTrail_ThTick, "sealtrail", sealThread);
+	if (t == NULL)
+	{
+		return;
+	}
+	t->flags |= THREAD_FLAG_DISABLE_COLLISION;
+	t->funcThDestroy = RB_SealTrail_ThDestroy;
+	struct SealTrail *trail = t->object;
+	memset(trail, 0, sizeof(*trail));
+	for (int i = 0; i < SEAL_TRAIL_GHOST_COUNT; i++)
+	{
+		struct Instance *ghost = INSTANCE_Birth3D(sealThread->inst->model, ghostName, t);
+		if (ghost == NULL)
+		{
+			break; // A full instance pool must not prevent the hazard from working.
+		}
+		trail->ghosts[i] = ghost;
+		RB_SealTrail_CopyPose(ghost, sealThread->inst);
+		ghost->flags |= HIDE_MODEL;
+		ghost->scale = sealThread->inst->scale;
+	}
+}
 
 // one seal can not collide with more than one other thread,
 // then quits, it was like that in the original game too,
@@ -93,214 +208,132 @@ int RB_Seal_ThCollide(struct Thread *sealThread, struct Thread *driverTh, void *
 	return sps->Input1.modelID == DYNAMIC_PLAYER;
 }
 
+static struct SpawnType2 *RB_Seal_GetPath(const struct Seal *seal)
+{
+	struct Level *level = sdata->gGT->level1;
+	if (level->ptrSpawnType2 == NULL || seal->sealID < 0 || seal->sealID >= level->numSpawnType2)
+	{
+		return NULL;
+	}
+	struct SpawnType2 *path = &level->ptrSpawnType2[seal->sealID];
+	return path->numCoords > 0 && path->coords.positions != NULL ? path : NULL;
+}
+
+static int RB_Seal_SetNextSegment(struct Seal *seal)
+{
+	struct SpawnType2 *path = RB_Seal_GetPath(seal);
+	seal->segmentFrames = 0;
+	seal->distFromSpawn = 0;
+	if (path == NULL || path->numCoords < 2 || path->numCoords > 32767) return 0;
+	seal->spawnPos = path->coords.positions[seal->direction];
+	for (int skipped = 0; skipped < path->numCoords; skipped++)
+	{
+		seal->direction = (seal->direction + 1) % path->numCoords;
+		seal->endPos = path->coords.positions[seal->direction];
+		int dx = (int)seal->endPos.x - seal->spawnPos.x;
+		int dy = (int)seal->endPos.y - seal->spawnPos.y;
+		int dz = (int)seal->endPos.z - seal->spawnPos.z;
+		if (dx == 0 && dy == 0 && dz == 0) continue;
+		int length = (int)sqrt((double)dx * dx + (double)dy * dy + (double)dz * dz);
+		// Preserve the old first-leg speed (45 updates), then use it for every leg.
+		if (seal->speedQ8 == 0) seal->speedQ8 = (length * 256 + 44) / 45;
+		seal->segmentFrames = (length * 256 + seal->speedQ8 - 1) / seal->speedQ8;
+		if (seal->segmentFrames < 1) seal->segmentFrames = 1;
+		if (seal->segmentFrames > 32767) seal->segmentFrames = 32767;
+		if (dx != 0 || dz != 0) seal->turnAroundRot.y = ratan2(-dx, -dz) & 0xfff;
+		seal->turnAroundRot.x = seal->rotCurr.x;
+		seal->turnAroundRot.z = seal->rotCurr.z;
+		return 1;
+	}
+	return 0;
+}
+
+static void RB_Seal_Animate(struct Instance *inst)
+{
+	int frames = INSTANCE_GetNumAnimFrames(inst, 0);
+	inst->animFrame = inst->animFrame + 2 < frames ? inst->animFrame + 2 : 0;
+}
+
+static void RB_Seal_ThDestroy(struct Thread *t)
+{
+#ifdef CTR_NATIVE
+	NativeAudio_StopSealLoop(t->inst);
+#endif
+	if (t->inst != NULL) t->inst->thread = NULL;
+}
+
 void RB_Seal_ThTick_TurnAround(struct Thread *t)
 {
-	struct Instance *sealInst;
-	struct Seal *sealObj;
-
-	sealInst = t->inst;
-	sealObj = (struct Seal *)t->object;
-
-	// if animation is not over
-	if ((sealInst->animFrame + 2) < INSTANCE_GetNumAnimFrames(sealInst, 0))
+	struct Instance *inst = t->inst;
+	struct Seal *seal = t->object;
+	RB_Seal_Animate(inst);
+	seal->rotCurr.y = RB_Hazard_InterpolateValue(seal->rotCurr.y, seal->turnAroundRot.y, 0x80);
+	ConvertRotToMatrix(&inst->matrix, &seal->rotCurr);
+	seal->numFramesSpinning++;
+	if (seal->rotCurr.y == seal->turnAroundRot.y)
 	{
-		// increment frame
-		sealInst->animFrame = sealInst->animFrame + 2;
+		seal->numFramesSpinning = 0;
+		seal->rotDesired = seal->rotCurr;
+		ThTick_Set(t, RB_Seal_ThTick_Move);
 	}
-
-	// if animation is done
-	else
-	{
-		// reset animation
-		sealInst->animFrame = 0;
-
-		// only play sound in TurnAround
-		PlaySound3D(0x77, sealInst);
-	}
-
-	// if rotation is finished
-	if (sealObj->rotCurr.y == sealObj->turnAroundRot.y)
-	{
-		sealObj->numFramesSpinning = 0;
-
-		for (int i = 0; i < 3; i++)
-		{
-			CTR_VECTOR_DATA(&(sealObj->rotDesired))[i] = CTR_VECTOR_DATA(&(sealObj->rotCurr))[i];
-		}
-
-		ConvertRotToMatrix(&sealInst->matrix, &sealObj->rotCurr);
-
-		ThTick_SetAndExec(t, RB_Seal_ThTick_Move);
-		return;
-	}
-
-	else
-	{
-		// spin rotCurrY 180 degrees (turn around)
-		sealObj->rotCurr.y = RB_Hazard_InterpolateValue(sealObj->rotCurr.y, sealObj->turnAroundRot.y, 0x80);
-
-		// negate rotCurrX (slant)
-		sealObj->rotCurr.x = RB_Hazard_InterpolateValue(sealObj->rotCurr.x, -sealObj->rotDesired.x, 0x14);
-
-		// negate rotCurrZ (slant)
-		sealObj->rotCurr.z = RB_Hazard_InterpolateValue(sealObj->rotCurr.z, -sealObj->rotDesired.z, 0x14);
-
-		sealObj->numFramesSpinning++;
-
-		// converted to TEST in rebuildPS1
-		ConvertRotToMatrix(&sealInst->matrix, &sealObj->rotCurr);
-	}
-
-	Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
+	if (!PlaySealAmbientSound(inst) && inst->animFrame == 0) PlaySound3D(0x77, inst);
+	Seal_CheckColl(inst, t, 1, 0x4000, 0x78);
 }
 
 void RB_Seal_ThTick_Move(struct Thread *t)
 {
-	struct Instance *sealInst;
-	struct Seal *sealObj;
-	int i;
-
-	sealInst = t->inst;
-	sealObj = (struct Seal *)t->object;
-
-	// if animation is not over
-	if ((sealInst->animFrame + 2) < INSTANCE_GetNumAnimFrames(sealInst, 0))
+	struct Instance *inst = t->inst;
+	struct Seal *seal = t->object;
+	RB_Seal_Animate(inst);
+	if (seal->segmentFrames > 0)
 	{
-		// increment frame
-		sealInst->animFrame = sealInst->animFrame + 2;
-	}
-
-	// if animation is done
-	else
-	{
-		// reset animation
-		sealInst->animFrame = 0;
-
-		// no sound here
-	}
-
-	// move seal
-	for (i = 0; i < 3; i++)
-	{
-		sealInst->matrix.t[i] = (int)CTR_VECTOR_DATA(&(sealObj->spawnPos))[i] - (sealObj->distFromSpawn * (int)CTR_VECTOR_DATA(&(sealObj->vel))[i]) / 0x2d;
-	}
-
-	// moving towards spawn (0)
-	if (sealObj->direction == 0)
-	{
-		if (sealObj->distFromSpawn > 0)
+		seal->distFromSpawn++;
+		for (int axis = 0; axis < 3; axis++)
 		{
-			sealObj->distFromSpawn--;
-			Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
-			return;
+			int start = CTR_VECTOR_DATA(&seal->spawnPos)[axis];
+			int delta = (int)CTR_VECTOR_DATA(&seal->endPos)[axis] - start;
+			inst->matrix.t[axis] = start + (s32)((s64)delta * seal->distFromSpawn / seal->segmentFrames);
 		}
-
-		if (sealObj->distFromSpawn != 0)
+		if (seal->distFromSpawn >= seal->segmentFrames && RB_Seal_SetNextSegment(seal))
 		{
-			Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
-			return;
+			ThTick_Set(t, RB_Seal_ThTick_TurnAround);
 		}
-
-		sealObj->direction = 1;
 	}
-
-	// moving away from spawn (1)
-	else
-	{
-		if (sealObj->distFromSpawn < 0x2d)
-		{
-			sealObj->distFromSpawn++;
-			Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
-			return;
-		}
-
-		if (sealObj->distFromSpawn != 0x2d)
-		{
-			Seal_CheckColl(sealInst, t, 1, 0x4000, 0x78);
-			return;
-		}
-
-		sealObj->direction = 0;
-	}
-
-	// === end of Move state ===
-
-	// flip Y 180 degrees (turn around)
-	sealObj->turnAroundRot.y = (sealObj->rotCurr.y + 0x800) & 0xfff;
-
-	// turn around
-	ThTick_SetAndExec(t, RB_Seal_ThTick_TurnAround);
-	return;
+	PlaySealAmbientSound(inst);
+	Seal_CheckColl(inst, t, 1, 0x4000, 0x78);
 }
 
 void RB_Seal_LInB(struct Instance *inst)
 {
-	struct Seal *sealObj;
-	struct SpawnType2 *spawnType2;
-	struct InstDef *instDef;
-	struct Thread *t;
-
-	if (inst->thread != 0)
-	{
-		return;
-	}
-
-	t = PROC_BirthWithObject(
-	    // creation flags
+	if (inst->thread != NULL) return;
+	struct Thread *t = PROC_BirthWithObject(
 	    SIZE_RELATIVE_POOL_BUCKET(sizeof(struct Seal), NONE, SMALL, STATIC),
-
-	    RB_Seal_ThTick_Move, // behavior
-	    "seal",              // debug name
-	    0                    // thread relative
-	);
-
-	if (t == 0)
-	{
-		return;
-	}
+	    RB_Seal_ThTick_Move, "seal", NULL);
+	if (t == NULL) return;
 	inst->thread = t;
 	t->inst = inst;
 	t->funcThCollide = (void *)RB_Seal_ThCollide;
-
-	inst->scale.x = 0x2000;
-	inst->scale.y = 0x2000;
-	inst->scale.z = 0x2000;
-
-	sealObj = ((struct Seal *)t->object);
-	sealObj->distFromSpawn = 0;
-	sealObj->direction = 1;
-	sealObj->sealID = inst->name[strlen(inst->name) - 1] - '0';
-
-	if (sdata->gGT->level1->numSpawnType2 != 0)
+	t->funcThDestroy = RB_Seal_ThDestroy;
+	inst->scale = (SVec3){0x2000, 0x2000, 0x2000};
+	struct Seal *seal = t->object;
+	memset(seal, 0, sizeof(*seal));
+	// Support multi-digit path indices while validating the spawn table.
+	int nameLength = (int)strlen(inst->name);
+	int suffix = nameLength;
+	while (suffix > 0 && inst->name[suffix - 1] >= '0' && inst->name[suffix - 1] <= '9') suffix--;
+	int pathIndex = suffix == nameLength ? -1 : atoi(inst->name + suffix);
+	seal->sealID = pathIndex >= 0 && pathIndex < sdata->gGT->level1->numSpawnType2 ? pathIndex : -1;
+	if (inst->instDef != NULL) seal->rotCurr = inst->instDef->rot;
+	seal->rotCurr.y &= 0xfff;
+	seal->rotDesired = seal->rotCurr;
+	seal->turnAroundRot = seal->rotCurr;
+	struct SpawnType2 *path = RB_Seal_GetPath(seal);
+	if (path != NULL)
 	{
-		spawnType2 = &sdata->gGT->level1->ptrSpawnType2[sealObj->sealID];
-
-		sealObj->spawnPos = spawnType2->coords.positions[0];
-		sealObj->endPos = spawnType2->coords.positions[1];
+		CTR_COPY_VEC3(inst->matrix.t, CTR_VECTOR_DATA(&path->coords.positions[0]));
+		if (RB_Seal_SetNextSegment(seal)) ThTick_Set(t, RB_Seal_ThTick_TurnAround);
 	}
-
-	// distance between points
-	for (int i = 0; i < 3; i++)
-	{
-		CTR_VECTOR_DATA(&(sealObj->vel))[i] = CTR_VECTOR_DATA(&(sealObj->spawnPos))[i] - CTR_VECTOR_DATA(&(sealObj->endPos))[i];
-	}
-
-	// rotCurr
-	instDef = inst->instDef;
-	sealObj->rotCurr.x = instDef->rot.x;
-	sealObj->rotCurr.y = instDef->rot.y;
-	sealObj->rotCurr.z = instDef->rot.z;
-
-	for (int i = 0; i < 3; i++)
-	{
-		CTR_VECTOR_DATA(&(sealObj->rotDesired))[i] = CTR_VECTOR_DATA(&(sealObj->rotCurr))[i];
-	}
-
-	sealObj->numFramesSpinning = 0;
-
-	// converted to TEST in rebuildPS1
-	ConvertRotToMatrix(&inst->matrix, &sealObj->rotCurr);
-
-	// dont call RB_Default_LInB(inst),
-	// we know seal is never over ice
+	ConvertRotToMatrix(&inst->matrix, &seal->rotCurr);
+	RB_SealTrail_Init(t);
+	PlaySealAmbientSound(inst);
 }

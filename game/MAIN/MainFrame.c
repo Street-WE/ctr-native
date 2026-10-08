@@ -39,6 +39,7 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 			sdata->boolSoundPaused = 0;
 			#ifdef CTR_NATIVE
 				NativeAudio_ResumeMusic();
+				NativeAudio_PauseSealLoops(0);
 			#endif
 		}
 	}
@@ -49,6 +50,7 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 		sdata->boolSoundPaused = 1;
 		#ifdef CTR_NATIVE
 			NativeAudio_PauseMusic();
+			NativeAudio_PauseSealLoops(1);
 		#endif
 	}
 	return;

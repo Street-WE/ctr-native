@@ -166,6 +166,9 @@ void MainInit_PrimMem(struct GameTracker *gGT)
 
 void MainInit_JitPoolsReset(struct GameTracker *gGT)
 {
+#ifdef CTR_NATIVE
+	NativeAudio_StopSealLoops();
+#endif
 	JitPool_Clear(&gGT->JitPools.thread);
 	JitPool_Clear(&gGT->JitPools.instance);
 	JitPool_Clear(&gGT->JitPools.smallStack);

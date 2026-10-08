@@ -378,6 +378,20 @@ struct NativeAudioSnapshot
 
 global_variable struct NativeAudioState s_audio;
 
+#define NATIVE_AUDIO_SEAL_SOURCE_COUNT 32
+struct NativeAudioSealSource
+{
+	const void *owner; // identity only; the audio thread never dereferences it
+	int currentFrame;
+	int volumeLeft;
+	int volumeRight;
+};
+static struct NativeAudioSealSource s_sealSources[NATIVE_AUDIO_SEAL_SOURCE_COUNT];
+static s16 *s_sealPcm;
+static int s_sealFrameCount;
+static int s_sealChecked;
+static int s_sealPaused;
+
 internal b32 NativeAudio_OutputOpen(void)
 {
 	return s_audio.output.stream != NULL;
@@ -2633,6 +2647,9 @@ int NativeAudio_RestoreState(const void *src, int srcSize)
 	NativeAudio_CloseXANoLock();
 
 	s_audio.init = restoreInit;
+	// Emitters are recreated from restored hazard positions on the next tick.
+	memset(s_sealSources, 0, sizeof(s_sealSources));
+	s_sealPaused = 0;
 	s_audio.muted = snapshot->muted;
 	s_audio.spu.allocCursor = snapshot->spuAllocCursor;
 	s_audio.reverbEnabled = snapshot->reverbEnabled;
@@ -2780,6 +2797,24 @@ internal void NativeAudio_MixFrame(s16 *outLeft, s16 *outRight)
 		}
 
 		s_audio.music.currentFrame = frame;
+	}
+
+	if (s_sealPcm != NULL && s_sealFrameCount > 0 && !s_sealPaused)
+	{
+		for (i = 0; i < NATIVE_AUDIO_SEAL_SOURCE_COUNT; i++)
+		{
+			struct NativeAudioSealSource *source = &s_sealSources[i];
+			if (source->owner == NULL) continue;
+			int sample = s_sealPcm[source->currentFrame];
+			if (!s_audio.muted)
+			{
+				NativeAudio_MixSample(&mixLeft, &mixRight,
+				    NativeAudio_ApplyVolume(sample, source->volumeLeft, s_audio.masterVolumeLeft),
+				    NativeAudio_ApplyVolume(sample, source->volumeRight, s_audio.masterVolumeRight));
+			}
+			source->currentFrame++;
+			if (source->currentFrame >= s_sealFrameCount) source->currentFrame = 0;
+		}
 	}
 
 	if (!s_audio.muted)
@@ -3007,6 +3042,11 @@ void NativeAudio_Shutdown(void)
 
 	NativeAudio_CloseMusicNoLock();
 	NativeAudio_CloseXANoLock();
+	SDL_free(s_sealPcm);
+	s_sealPcm = NULL;
+	s_sealFrameCount = 0;
+	s_sealChecked = 0;
+	memset(s_sealSources, 0, sizeof(s_sealSources));
 	SDL_QuitSubSystem(SDL_INIT_AUDIO);
 }
 
@@ -3502,6 +3542,85 @@ int NativeAudio_PlayXAFile(const char *relativePath, int channelFilter, int volu
 	NativeAudio_XaPreparedStreamClose(&prepared);
 
 	return 1;
+}
+
+static int NativeAudio_LoadSealLoop(void)
+{
+	if (s_sealChecked) return s_sealPcm != NULL;
+	s_sealChecked = 1;
+	char path[NATIVE_ASSETS_PATH_MAX];
+	SDL_AudioSpec spec;
+	SDL_AudioSpec target = {SDL_AUDIO_S16LE, 1, NATIVE_AUDIO_SAMPLE_RATE};
+	Uint8 *data = NULL;
+	Uint8 *converted = NULL;
+	Uint32 size = 0;
+	int convertedSize = 0;
+	if (!NativeAssets_ResolvePath("mods/models/hazards/sounds/seal.wav", path, sizeof(path)) ||
+	    !SDL_LoadWAV(path, &spec, &data, &size))
+	{
+		return 0;
+	}
+	int ok = size <= INT_MAX && SDL_ConvertAudioSamples(&spec, data, (int)size, &target, &converted, &convertedSize);
+	SDL_free(data);
+	if (!ok || convertedSize <= 0 || convertedSize % sizeof(s16) != 0)
+	{
+		SDL_free(converted);
+		return 0;
+	}
+	NativeAudio_LockOutput();
+	s_sealPcm = (s16 *)converted;
+	s_sealFrameCount = convertedSize / sizeof(s16);
+	NativeAudio_UnlockOutput();
+	return 1;
+}
+
+int NativeAudio_UpdateSealLoop(const void *source, int volumeLeft, int volumeRight)
+{
+	if (source == NULL || !NativeAudio_SpuInit() || !NativeAudio_LoadSealLoop()) return 0;
+	NativeAudio_LockOutput();
+	struct NativeAudioSealSource *slot = NULL;
+	for (int i = 0; i < NATIVE_AUDIO_SEAL_SOURCE_COUNT; i++)
+	{
+		if (s_sealSources[i].owner == source)
+		{
+			slot = &s_sealSources[i];
+			break;
+		}
+		if (slot == NULL && s_sealSources[i].owner == NULL) slot = &s_sealSources[i];
+	}
+	if (slot != NULL)
+	{
+		slot->owner = source;
+		slot->volumeLeft = volumeLeft;
+		slot->volumeRight = volumeRight;
+	}
+	NativeAudio_UnlockOutput();
+	return slot != NULL;
+}
+
+void NativeAudio_StopSealLoop(const void *source)
+{
+	NativeAudio_LockOutput();
+	for (int i = 0; i < NATIVE_AUDIO_SEAL_SOURCE_COUNT; i++)
+	{
+		if (s_sealSources[i].owner == source) memset(&s_sealSources[i], 0, sizeof(s_sealSources[i]));
+	}
+	NativeAudio_UnlockOutput();
+}
+
+void NativeAudio_StopSealLoops(void)
+{
+	NativeAudio_LockOutput();
+	memset(s_sealSources, 0, sizeof(s_sealSources));
+	s_sealPaused = 0;
+	NativeAudio_UnlockOutput();
+}
+
+void NativeAudio_PauseSealLoops(int paused)
+{
+	NativeAudio_LockOutput();
+	s_sealPaused = paused != 0;
+	NativeAudio_UnlockOutput();
 }
 
 int NativeAudio_PlayMusicWav(

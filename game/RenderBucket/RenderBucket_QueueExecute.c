@@ -1246,6 +1246,24 @@ static struct ModelHeader *RenderBucket_SelectModelHeader(struct Instance *inst,
 	headersRemaining = inst->model->numHeaders;
 	lodIndex = 0;
 
+#ifdef CTR_NATIVE
+	// Optional trace is flushed by Platform_Log so the last entry survives
+	// a fault while reading a model header.
+	{
+		static int traceModelLod = -1;
+		if (traceModelLod < 0)
+		{
+			const char *trace = getenv("CTR_TRACE_MODEL_LOD");
+			traceModelLod = (trace != NULL && trace[0] == '1');
+		}
+		if (traceModelLod)
+		{
+			Platform_Log("[LOD trace] inst=%p name=%.16s model=%p headers=%p count=%d depth=%d\n",
+			             (void *)inst, inst->name, (void *)inst->model, (void *)mh, headersRemaining, viewDepth);
+		}
+	}
+#endif
+
 	// NOTE(aalhendi): Retail 0x80070ae4-0x80070b34 uses transformed GTE depth,
 	// GTE H, and a post-decrement s4/s5 header walk. Native keeps the same
 	// comparison and walk as explicit C state.

@@ -61,4 +61,9 @@ void NativeAudio_SetMusicVolume(
 
 int NativeAudio_IsMusicPlaying(void);
 
+int NativeAudio_UpdateSealLoop(const void *source, int volumeLeft, int volumeRight);
+void NativeAudio_StopSealLoop(const void *source);
+void NativeAudio_StopSealLoops(void);
+void NativeAudio_PauseSealLoops(int paused);
+
 #endif

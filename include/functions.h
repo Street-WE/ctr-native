@@ -995,6 +995,8 @@ void Seal_CheckColl(struct Instance *sealInst, struct Thread *sealTh, int damage
 void RB_Seal_ThTick_Move(struct Thread *t);
 void RB_Seal_ThTick_TurnAround(struct Thread *t);
 void RB_Seal_LInB(struct Instance *inst);
+void RB_SealTrail_ThTick(struct Thread *t);
+int PlaySealAmbientSound(struct Instance *inst);
 
 void RB_Snowball_ThTick(struct Thread *t);
 void RB_Snowball_LInB(struct Instance *inst);

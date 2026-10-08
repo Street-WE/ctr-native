@@ -46,7 +46,7 @@ struct Driver *RB_CrateAny_GetDriver(struct Thread *t, struct ScratchpadStruct *
 	}
 
 	// if driver itself
-	else if (hitModelIDValue == DYNAMIC_PLAYER) // //player model
+	else if ((hitModelIDValue == DYNAMIC_PLAYER) || (hitModelIDValue == DYNAMIC_ROBOT_CAR))
 	{
 		driver = (struct Driver *)t->object;
 
@@ -411,6 +411,14 @@ int RB_CrateFruit_ThCollide(struct Thread *crateThread, struct Thread *colliding
 			}
 			newWumpa = random + (newWumpa >> 2) * -4 + 5;
 			*/
+
+			// Bots have no pickup HUD; award the fruit directly and avoid
+			// indexing the human push buffers with a bot driver ID.
+			if ((driver->actionsFlagSet & ACTION_BOT) != 0)
+			{
+				RB_Player_ModifyWumpa(driver, newWumpa);
+				return 1;
+			}
 
 			driver->PickupWumpaHUD.cooldown = 5;
 			driver->PickupWumpaHUD.numCollected = newWumpa;
