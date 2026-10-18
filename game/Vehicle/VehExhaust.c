@@ -41,8 +41,8 @@ static const struct ExhaustTemplate sExhaustTemplates[] =
     [RED_BEARD] = {
         .count = 2,
         .outlets = {
-            { .position = {20, 50, -50}, .smokeScale = 256, .flameScale = 256 },
-            { .position = {-20, 50, -50}, .smokeScale = 256, .flameScale = 256, .mirrorFlame = true },
+            { .position = {20, 38, -56}, .smokeScale = 256, .flameScale = 256 },
+            { .position = {-20, 38, -56}, .smokeScale = 256, .flameScale = 256, .mirrorFlame = true },
         },
     },
     [ROBO_RACER] = {

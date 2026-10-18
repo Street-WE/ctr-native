@@ -1,5 +1,15 @@
 #include <common.h>
 
+static int DrawTires_ProjectionIsValid(void)
+{
+	// Custom racers have a single LOD, so their tyres can reach this path
+	// at distances where retail racers have already selected a lower LOD.
+	// Do not emit corners clamped by RTPT/RTPS. IR3 saturation alone is valid
+	// for unsigned depths above 32767 and must not hide distant geometry.
+	const u32 invalidProjection = (7u << 28) | (7u << 25) | (3u << 23) | (3u << 17) | (15u << 13);
+	return (CFC2(31) & invalidProjection) == 0;
+}
+
 static const u32 sDrawTiresSolidJumpTable[8] = {
     0x8006ed7c, 0x8006ed98, 0x8006edb4, 0x8006edcc, 0x8006ede4, 0x8006ee00, 0x8006ee1c, 0x8006ee3c,
 };
@@ -496,6 +506,10 @@ static void DrawTiresSolid_LinkPrimitive(struct DrawTiresScratch *scratch, POLY_
 static int DrawTiresSolid_EmitProjectedWheel(struct DrawTiresScratch *scratch, struct DrawTiresSolidProjectedWheel *selected, struct PrimMem *primMem,
                                              int *primCount)
 {
+	if ((char *)primMem->cursor + sizeof(POLY_FT4) > (char *)primMem->guardEnd)
+	{
+		return 0;
+	}
 	POLY_FT4 *p = (POLY_FT4 *)primMem->cursor;
 	int selectedOTSlot = selected->selectedOTSlot;
 	int sxy[4];
@@ -540,12 +554,14 @@ static int DrawTiresSolid_ProjectWheelQuads(struct DrawTiresScratch *scratch, st
 		DrawTiresSolid_LoadCorner(scratch, 2, wheelIndex, -1, 1);
 
 		gte_rtpt_b();
+		if (!DrawTires_ProjectionIsValid()) continue;
 		scratch->projectedSxy[0] = MFC2(12);
 		scratch->projectedSxy[1] = MFC2(13);
 		scratch->projectedSxy[2] = MFC2(14);
 
 		DrawTiresSolid_LoadCorner(scratch, 0, wheelIndex, 1, 1);
 		gte_rtps_b();
+		if (!DrawTires_ProjectionIsValid()) continue;
 		scratch->projectedSxy[3] = MFC2(14);
 
 		struct DrawTiresSolidProjectedWheel projectedWheel = DrawTiresSolid_SelectProjectedWheel(scratch, wheelIndex);
@@ -1061,6 +1077,10 @@ static void DrawTiresReflection_LinkPrimitive(struct DrawTiresScratch *scratch, 
 static void DrawTiresReflection_EmitProjectedWheel(struct DrawTiresScratch *scratch, struct DrawTiresReflectionProjectedWheel *selected,
                                                    struct PrimMem *primMem, int *primCount, int wheelIndex)
 {
+	if ((char *)primMem->cursor + sizeof(POLY_FT4) > (char *)primMem->guardEnd)
+	{
+		return;
+	}
 	POLY_FT4 *p = (POLY_FT4 *)primMem->cursor;
 	struct DrawTiresWheelLocal *wheelLocal = &scratch->wheelLocal[wheelIndex];
 	int selectedOTSlot = selected->selectedOTSlot;
@@ -1105,12 +1125,14 @@ static int DrawTiresReflection_ProjectWheelQuads(struct DrawTiresScratch *scratc
 		DrawTiresReflection_LoadCorner(scratch, 2, wheelIndex, -1, 1);
 
 		gte_rtpt_b();
+		if (!DrawTires_ProjectionIsValid()) continue;
 		scratch->projectedSxy[1] = MFC2(12);
 		scratch->projectedSxy[0] = MFC2(13);
 		scratch->projectedSxy[3] = MFC2(14);
 
 		DrawTiresReflection_LoadCorner(scratch, 0, wheelIndex, 1, 1);
 		gte_rtps_b();
+		if (!DrawTires_ProjectionIsValid()) continue;
 		scratch->projectedSxy[2] = MFC2(14);
 
 		struct DrawTiresReflectionProjectedWheel projectedWheel = DrawTiresReflection_SelectProjectedWheel(scratch, wheelIndex);

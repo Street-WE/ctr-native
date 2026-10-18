@@ -490,10 +490,13 @@ struct Fireball
 	// unused
 	s16 direction;
 
-	// 0x10 bytes large
+	s32 pathIndex;
+	s32 pathNode;
+	s32 hopTime;
+	// 0x1c bytes large
 };
 CTR_STATIC_ASSERT(offsetof(struct Fireball, rot_unused) == 0x6);
-CTR_STATIC_ASSERT(sizeof(struct Fireball) == 0x10);
+CTR_STATIC_ASSERT(sizeof(struct Fireball) == 0x1c);
 
 struct FlameJet
 {

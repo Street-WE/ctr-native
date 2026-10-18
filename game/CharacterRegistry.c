@@ -22,7 +22,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "R. Racer",
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_RED_BLUE_GRADIENT,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = HIGH_EXHAUST,
     },
     [TINY_TIGER] = {
@@ -110,7 +110,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "Kahuka",
         .engineClass = TURN,
         .minimapColor = TINY_GREEN,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = PAIR_LOW,
     },
     [RIPPER_ROO] = {
@@ -121,7 +121,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "Redbeard",
         .engineClass = BALANCED,
         .minimapColor = PLAYER_YELLOW,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = RED_BEARD,
     },
     [KOMODO_JOE] = {
@@ -132,7 +132,7 @@ static const struct CharacterDef sCharacterRegistry[] =
         .shortName = "Basil",
         .engineClass = SPEED,
         .minimapColor = EXT_COLOR_BASIL_RED,
-        .flags = CHARACTER_FLAG_HAS_WHEELS,
+        .flags = 0,
         .exhaustType = SINGLE_BASIL,
     },
     [N_TROPY] = {

@@ -84,13 +84,13 @@ typedef struct
 	bool psxTextureOutputSTP;
 	bool psxDrawMaskSet;
 
-	u16 startVertex;
-	u16 numVerts;
+	u32 startVertex;
+	u32 numVerts;
 
 	const char *debugText;
 } GPUDrawSplit;
 
-#define MAX_DRAW_SPLITS 4096
+#define MAX_DRAW_SPLITS 65536
 
 typedef struct
 {
@@ -1816,6 +1816,19 @@ internal int ProcessPsyXPrims(P_TAG *polyTag)
 int ParsePrimitive(P_TAG *polyTag)
 {
 	const int primType = polyTag->code & 0xF0;
+
+	// Every geometry command emits at most 18 vertices (a four-point line)
+	// and creates at most one split. Submit the pending batch before either
+	// array can overflow.
+	// Keep parsing in OT order, including texture bindings and draw commands.
+	if ((u32)s_gpu.vertexIndex > MAX_VERTEX_BUFFER_SIZE - 18 || s_gpu.splitIndex + 1 >= MAX_DRAW_SPLITS)
+	{
+		const char *debugText = s_gpu.currentSplitDebugText;
+		GPUDrawSplit *lastSplit = &s_gpu.splits[s_gpu.splitIndex];
+		lastSplit->numVerts = s_gpu.vertexIndex - lastSplit->startVertex;
+		DrawAllSplits();
+		s_gpu.currentSplitDebugText = debugText;
+	}
 
 	int primLength = 0;
 	bool handledZeroLength = false;

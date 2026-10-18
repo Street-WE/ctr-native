@@ -2392,7 +2392,7 @@ internal void NativeRenderer_SetWireframe(int enable)
 void NativeRenderer_UpdateVertexBuffer(const GrVertex *vertices, int num_vertices)
 {
 	NativePerf_BeginScope(NATIVE_PERF_BUCKET_RENDERER_VERTEX_UPLOAD);
-	if ((u32)num_vertices >= MAX_VERTEX_BUFFER_SIZE)
+	if ((u32)num_vertices > MAX_VERTEX_BUFFER_SIZE)
 	{
 		NATIVE_RENDERER_ERROR("%s\n", "MAX_VERTEX_BUFFER_SIZE reached, expect rendering errors");
 		num_vertices = MAX_VERTEX_BUFFER_SIZE;

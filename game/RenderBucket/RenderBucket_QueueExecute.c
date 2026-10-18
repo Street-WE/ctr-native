@@ -5149,6 +5149,17 @@ static void RenderBucket_DrawObj(struct RenderBucketDrawContext *ctx, const stru
             MTC2((s16)z, j * 2 + 1);
         }
         gte_rtpt();
+        /* Read RTPT flags before NCLIP replaces them. Positive SZ alone
+         * does not guarantee a valid projection: divide overflow and clamped
+         * screen/XY coordinates can turn individual faces into large spikes.
+         * IR3 saturation (bit 22) is allowed: distant positive depths above
+         * 32767 remain valid in the unsigned SZ FIFO. */
+        const u32 invalidProjection =
+            (7u << 28) | (7u << 25) | /* MAC1..3 overflow */
+            (3u << 23) |             /* IR1/IR2 saturation */
+            (3u << 17) |             /* SZ saturation / divide overflow */
+            (15u << 13);             /* MAC0 overflow / SXY saturation */
+        if (CFC2(31) & invalidProjection) continue;
         /* Reject near-plane crossings instead of emitting saturated geometry. */
         if (MFC2(17) < 16 || MFC2(18) < 16 || MFC2(19) < 16) continue;
         int facing;
