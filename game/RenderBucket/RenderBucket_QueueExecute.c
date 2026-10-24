@@ -5074,12 +5074,9 @@ static int RenderBucket_RunInstanceSetupCallback(struct RenderBucketDrawContext 
 	case RB_RETAIL_INST_SETUP_FADE_COLOR:
 		// The syms label calls this Draw_KartGhost, but this is the
 		// Instance+0x5c setup/fade callback.
-		if (ctx->inst->colorRGBA != 0)
-		{
-			RenderBucket_SetFarColorFromInstance(ctx->inst);
-			return 1;
-		}
-
+		// Both ghost primitive writers consume fadeColor, including for
+		// coloured level instances. Leaving it stale can turn the mask's
+		// triangle command into an unrelated GPU command such as MoveImage.
 		{
 			union RenderBucketScratchColor *scratchFade = &RenderBucket_Scratch()->split.fadeColor;
 			int fade = (int)((u32)(0x1000 - (s32)ctx->inst->alphaScale) >> 5);

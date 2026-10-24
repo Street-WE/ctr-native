@@ -2113,6 +2113,16 @@ void NativeRenderer_StoreFrameBuffer(int x, int y, int w, int h)
 
 void NativeRenderer_CopyVRAM(u16 *src, int x, int y, int w, int h, int dst_x, int dst_y)
 {
+	// Invalid GPU packet coordinates must never become an unchecked host
+	// memcpy size or a pointer outside the fixed VRAM mirror.
+	if (w <= 0 || h <= 0 || w > VRAM_WIDTH || h > VRAM_HEIGHT ||
+	    dst_x < 0 || dst_y < 0 || dst_x > VRAM_WIDTH - w || dst_y > VRAM_HEIGHT - h ||
+	    x < 0 || y < 0 || (src == NULL && (x > VRAM_WIDTH - w || y > VRAM_HEIGHT - h)))
+	{
+		Platform_LogError("[CTR Native] Rejected invalid VRAM copy: source=(%d,%d) size=(%d,%d) destination=(%d,%d)\n",
+		                  x, y, w, h, dst_x, dst_y);
+		return;
+	}
 	int stride = w;
 
 	if (!src)

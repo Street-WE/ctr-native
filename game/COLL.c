@@ -325,6 +325,18 @@ void COLL_FIXED_TRIANGL_Barycentrics(SVec3 *out, const SVec3 *v1, const SVec3 *v
 
 u32 COLL_FIXED_INSTANC_TestPoint(struct ScratchpadStruct *sps, struct BSP *node)
 {
+	// Opening the wall makes the kart free to cross the instance's centre.
+	// Ignore its old sphere before computing contact normals (including the
+	// zero-length centre normal), even while the model is still fading.
+	if ((node->flag & BSP_HITBOX_COLLIDABLE) != 0)
+	{
+		struct InstDef *def = node->data.hitbox.instDef;
+		if (def != NULL && def->modelID == STATIC_TEETH && def->ptrInstance != NULL &&
+		    RB_Teeth_IsPermanentOpen(def->ptrInstance))
+		{
+			return 0;
+		}
+	}
 	struct CollInstanceHitboxScratch *scratch = &sps->collision.instanceHitbox;
 
 	if (Coll_BspHitboxClass(node) == BSP_HITBOX_CLASS_TOUCH)

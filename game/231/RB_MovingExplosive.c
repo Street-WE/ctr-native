@@ -212,6 +212,7 @@ LAB_800adc08:;
 #endif
 
 	int elapsedTime = gGT->elapsedTimeMS;
+	SVec3 previousWeaponPos = {inst->matrix.t[0], inst->matrix.t[1], inst->matrix.t[2]};
 	inst->matrix.t[0] += (((int)tw->vel.x * elapsedTime) >> 5);
 	inst->matrix.t[1] += (((int)tw->vel.y * elapsedTime) >> 5);
 	inst->matrix.t[2] += (((int)tw->vel.z * elapsedTime) >> 5);
@@ -242,6 +243,13 @@ LAB_800adc08:;
 	posB.x = inst->matrix.t[0];
 	posB.y = inst->matrix.t[1] + 0x100;
 	posB.z = inst->matrix.t[2];
+
+	SVec3 currentWeaponPos = {inst->matrix.t[0], inst->matrix.t[1], inst->matrix.t[2]};
+	if (RB_Teeth_CheckWeaponSweep(&previousWeaponPos, &currentWeaponPos, 0x40))
+	{
+		RB_MovingExplosive_Explode(t, inst, tw);
+		return;
+	}
 
 	struct ScratchpadStruct *sps = CTR_SCRATCHPAD_PTR(struct ScratchpadStruct, 0x108);
 

@@ -2,6 +2,116 @@
 
 static char s_teeth[] = "teeth";
 
+enum
+{
+	TEETH_ACCESS_ANIMATED = 1,
+	TEETH_ACCESS_PERMANENT = 4,
+	TEETH_FADE_DURATION_MS = 1000,
+	TEETH_FULL_TRANSPARENCY = 0x1000,
+	TEETH_PERMANENT_OPEN = -1,
+};
+
+static b32 RB_Teeth_IsPermanent(const struct Instance *inst)
+{
+	// The editor's instance name selects the variant without a new model ID.
+	return inst->instDef != NULL && strncmp(inst->instDef->name, "break_", 6) == 0;
+}
+
+u32 RB_Teeth_GetAccessFlag(const struct Instance *inst)
+{
+	return RB_Teeth_IsPermanent(inst) ? TEETH_ACCESS_PERMANENT : TEETH_ACCESS_ANIMATED;
+}
+
+b32 RB_Teeth_IsPermanentOpen(const struct Instance *inst)
+{
+	return RB_Teeth_IsPermanent(inst) && (sdata->doorAccessFlags & TEETH_ACCESS_PERMANENT) != 0;
+}
+
+// Use a private collision workspace: weapon explosions also call this while
+// the shared scratchpad contains the caller's collision search/callback state.
+b32 RB_Teeth_CheckWeaponSweep(const SVec3 *from, const SVec3 *to, s16 radius)
+{
+	struct Level *level = sdata->gGT->level1;
+	if (level == NULL || level->ptr_mesh_info == NULL || level->ptrInstDefs == NULL ||
+	    (sdata->gGT->gameMode1 & RELIC_RACE) != 0)
+	{
+		return false;
+	}
+	struct mesh_info *mesh = level->ptr_mesh_info;
+	struct ScratchpadStruct search = {0};
+	search.ptr_mesh_info = mesh;
+	search.Input1.pos = *to;
+	search.Union.QuadBlockColl.pos = *from;
+	search.Input1.hitRadius = radius;
+	search.Input1.hitRadiusSquared = radius * radius;
+	search.Union.QuadBlockColl.quadFlagsWanted = QUADBLOCK_FLAG_DOOR;
+	search.Union.QuadBlockColl.searchFlags = COLL_SEARCH_HIGH_LOD;
+	search.hitFraction = COLL_FRACTION_ONE;
+	for (int axis = 0; axis < 3; axis++)
+	{
+		int a = CTR_VECTOR_DATA(from)[axis];
+		int b = CTR_VECTOR_DATA(to)[axis];
+		int lo = (a < b ? a : b) - radius;
+		int hi = (a > b ? a : b) + radius;
+		CTR_VECTOR_DATA(&search.bbox.min)[axis] = lo < -32768 ? -32768 : lo;
+		CTR_VECTOR_DATA(&search.bbox.max)[axis] = hi > 32767 ? 32767 : hi;
+	}
+	u32 hitAccess = 0;
+	for (int i = 0; i < mesh->numQuadBlock; i++)
+	{
+		const struct QuadBlock *quad = &mesh->ptrQuadBlockArray[i];
+		u32 access = quad->terrain_type;
+		if ((quad->quadFlags & QUADBLOCK_FLAG_DOOR) == 0 ||
+		    (quad->quadFlags & (QUADBLOCK_FLAG_TRIGGER | QUADBLOCK_FLAG_NO_COLLISION_RESPONSE)) != 0 ||
+		    (access != TEETH_ACCESS_ANIMATED && access != TEETH_ACCESS_PERMANENT) ||
+		    (sdata->doorAccessFlags & access) != 0)
+		{
+			continue;
+		}
+		// Detect attacks from either side without changing the exported wall.
+		struct QuadBlock barrier = *quad;
+		barrier.draw_order_low |= QUADBLOCK_DRAW_ORDER_LOW_DOUBLE_SIDED;
+		int previousFraction = search.hitFraction;
+		COLL_MOVED_QUADBLK_TestTriangles(&barrier, &search);
+		if (search.hitFraction < previousFraction)
+		{
+			hitAccess = access;
+		}
+	}
+	if (hitAccess == 0)
+	{
+		return false;
+	}
+	// The access mask links barrier geometry to its door type. Pick the nearest
+	// matching instance so the original and permanent variants stay independent.
+	struct Instance *door = NULL;
+	s64 nearestDistance = 0;
+	for (u32 i = 0; i < level->numInstances; i++)
+	{
+		struct InstDef *def = &level->ptrInstDefs[i];
+		struct Instance *inst = def->ptrInstance;
+		if (def->modelID != STATIC_TEETH || inst == NULL || RB_Teeth_GetAccessFlag(inst) != hitAccess)
+		{
+			continue;
+		}
+		s64 dx = inst->matrix.t[0] - (s32)search.Union.QuadBlockColl.hitPos.x;
+		s64 dy = inst->matrix.t[1] - (s32)search.Union.QuadBlockColl.hitPos.y;
+		s64 dz = inst->matrix.t[2] - (s32)search.Union.QuadBlockColl.hitPos.z;
+		s64 distance = dx * dx + dy * dy + dz * dz;
+		if (door == NULL || distance < nearestDistance)
+		{
+			door = inst;
+			nearestDistance = distance;
+		}
+	}
+	if (door == NULL)
+	{
+		return false;
+	}
+	RB_Teeth_OpenDoor(door);
+	return (sdata->doorAccessFlags & hitAccess) != 0;
+}
+
 void RB_Teeth_LInB(struct Instance *inst)
 {
 	inst->depthBiasNormal += 2;
@@ -10,7 +120,7 @@ void RB_Teeth_LInB(struct Instance *inst)
 	if ((sdata->gGT->gameMode1 & RELIC_RACE) != 0)
 	{
 		// enable access through a door (disable collision)
-		sdata->doorAccessFlags |= 1;
+		sdata->doorAccessFlags |= RB_Teeth_GetAccessFlag(inst);
 
 		// Make invisible
 		inst->flags |= HIDE_MODEL;
@@ -57,7 +167,14 @@ void RB_Teeth_BSP_Callback(struct ScratchpadStruct *sps, void *hitObject)
 		}
 	}
 
-	((struct Teeth *)teethTh->object)->direction = TEETH_DIRECTION_OPENING;
+	if (RB_Teeth_IsPermanent(teethInst))
+	{
+		RB_Teeth_OpenDoor(teethInst);
+	}
+	else
+	{
+		((struct Teeth *)teethTh->object)->direction = TEETH_DIRECTION_OPENING;
+	}
 
 	return;
 }
@@ -73,6 +190,31 @@ void RB_Teeth_ThTick(struct Thread *t)
 	teeth = t->object;
 	inst = t->inst;
 	struct ScratchpadStruct *sps = CTR_SCRATCHPAD_PTR(struct ScratchpadStruct, 0x108);
+
+	if (RB_Teeth_IsPermanent(inst))
+	{
+		if (teeth->direction == TEETH_DIRECTION_OPENING)
+		{
+			// alphaScale is transparency: zero is opaque, 0x1000 invisible.
+			int elapsed = gGT->elapsedTimeMS;
+			if (elapsed > 0)
+			{
+				teeth->timeOpen += elapsed;
+			}
+			if (teeth->timeOpen >= TEETH_FADE_DURATION_MS)
+			{
+				inst->alphaScale = TEETH_FULL_TRANSPARENCY;
+				inst->flags |= HIDE_MODEL;
+				teeth->direction = TEETH_DIRECTION_IDLE;
+				teeth->timeOpen = TEETH_PERMANENT_OPEN;
+			}
+			else
+			{
+				inst->alphaScale = teeth->timeOpen * TEETH_FULL_TRANSPARENCY / TEETH_FADE_DURATION_MS;
+			}
+		}
+		return;
+	}
 
 	// if door is not moving
 	if (teeth->direction == TEETH_DIRECTION_IDLE)
@@ -244,6 +386,12 @@ int RB_Teeth_LInC(struct Instance *teethInst, struct Thread *t, struct Scratchpa
 
 	teeth = teethTh->object;
 
+	if (RB_Teeth_IsPermanent(teethInst) &&
+	    (teeth->direction == TEETH_DIRECTION_OPENING || teeth->timeOpen == TEETH_PERMANENT_OPEN))
+	{
+		return 2;
+	}
+
 	// if collided object is a player
 	if (sps->Input1.modelID == DYNAMIC_PLAYER)
 	{
@@ -291,8 +439,20 @@ void RB_Teeth_OpenDoor(struct Instance *inst)
 		}
 		teethTh->inst = inst;
 		((struct Teeth *)teethTh->object)->timeOpen = 0;
+		((struct Teeth *)teethTh->object)->direction = TEETH_DIRECTION_IDLE;
+	}
+	if (RB_Teeth_IsPermanent(inst))
+	{
+		struct Teeth *teeth = teethTh->object;
+		if (teeth->direction == TEETH_DIRECTION_OPENING || teeth->timeOpen == TEETH_PERMANENT_OPEN)
+		{
+			return;
+		}
+		teeth->timeOpen = 0;
+		inst->alphaScale = 0;
+		inst->flags |= GHOST_DRAW_TRANSPARENT;
 	}
 	PlaySound3D(0x75, inst); // play sound, teeth opening
 	((struct Teeth *)teethTh->object)->direction = TEETH_DIRECTION_OPENING;
-	sdata->doorAccessFlags |= 1; // enable access through a door (disable collision)
+	sdata->doorAccessFlags |= RB_Teeth_GetAccessFlag(inst);
 }
