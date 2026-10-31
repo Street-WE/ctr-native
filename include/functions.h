@@ -949,6 +949,8 @@ void RB_Baron_LInB(struct Instance *inst);
 
 void RB_Blade_ThTick(struct Thread *t);
 void RB_Blade_LInB(struct Instance *inst);
+void RB_Swinging_ThTick(struct Thread *thread);
+b32 RB_Swinging_LInB(struct Instance *inst);
 
 void RB_Armadillo_ThTick_TurnAround(struct Thread *t);
 void RB_Armadillo_ThTick_Rolling(struct Thread *t);

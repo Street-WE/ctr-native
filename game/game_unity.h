@@ -283,6 +283,7 @@
 #include "231/RB_Tracker.c"
 #include "231/RB_Baron.c"
 #include "231/RB_Blade.c"
+#include "231/RB_Swinging.c"
 #include "231/RB_Bubbles.c"
 #include "231/RB_Crate.c"
 #include "231/RB_Crystal.c"
