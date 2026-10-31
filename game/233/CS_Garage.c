@@ -293,7 +293,7 @@ void CS_Garage_MenuProc(struct RectMenu *menu)
 	}
 
 	// Color data
-	u32 *arrowColors = data.ptrColor[(s32)arrowColor];
+	u32 *arrowColors = Color_GetGradient((s32)arrowColor);
 
 	int nameLen = DecalFont_GetLineWidth(name, FONT_BIG) >> 1;
 

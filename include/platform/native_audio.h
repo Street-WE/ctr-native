@@ -41,4 +41,29 @@ int NativeAudio_GetStateSize(void);
 int NativeAudio_CaptureState(void *dst, int dstSize);
 int NativeAudio_RestoreState(const void *src, int srcSize);
 
+int NativeAudio_PlayWavFile(
+	const char *relativePath,
+	int volumeLeft,
+	int volumeRight,
+	int *durationTicks);
+
+int NativeAudio_PlayMusicWav(
+	const char *relativePath,
+	int volumeLeft,
+	int volumeRight);
+
+void NativeAudio_StopMusic(void);
+void NativeAudio_PauseMusic(void);
+void NativeAudio_ResumeMusic(void);
+void NativeAudio_SetMusicVolume(
+	int volumeLeft,
+	int volumeRight);
+
+int NativeAudio_IsMusicPlaying(void);
+
+int NativeAudio_UpdateSealLoop(const void *source, int volumeLeft, int volumeRight);
+void NativeAudio_StopSealLoop(const void *source);
+void NativeAudio_StopSealLoops(void);
+void NativeAudio_PauseSealLoops(int paused);
+
 #endif

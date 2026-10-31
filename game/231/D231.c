@@ -20,5 +20,6 @@ void OVR231_ResetRuntimeState(void)
 void OVR231_InitData(void)
 {
 	OVR231_ResetRuntimeState();
+	RB_Warpball_ResetRideState();
 }
 #endif

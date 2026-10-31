@@ -1,4 +1,5 @@
 #include <common.h>
+#include <LevelRegistry.h>
 
 enum UIRaceEndMenuOption
 {
@@ -282,7 +283,7 @@ LAB_80055930:
 		    // 8d878 + 110*4 -> Dingo Canyon
 
 		    // Level ID
-		    sdata->lngStrings[data.metaDataLEV[gGT->levelID].name_LNG],
+		    LevelRegistry_GetName(gGT->levelID, sdata->lngStrings[data.metaDataLEV[gGT->levelID].name_LNG]),
 
 		    gGT->pushBuffer[0].rect.x + ((gGT->pushBuffer[0].rect.w << 0x10) >> 0x11),
 

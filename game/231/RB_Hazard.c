@@ -3,6 +3,10 @@
 
 int RB_Hazard_HurtDriver(struct Driver *driverVictim, int damageType, struct Driver *driverAttacker, int reason)
 {
+	if (RB_Warpball_IsDriverRiding(driverVictim))
+    {
+        return 0;
+    }
 	struct GameTracker *gGT = sdata->gGT;
 	int result = 0;
 
@@ -37,6 +41,10 @@ struct Instance *RB_Hazard_CollideWithDrivers(struct Instance *weaponInst, s16 p
 		struct Driver *driver = sdata->gGT->drivers[i];
 
 		if (driver == 0)
+		{
+			continue;
+		}
+		if (RB_Warpball_IsDriverRiding(driver))
 		{
 			continue;
 		}

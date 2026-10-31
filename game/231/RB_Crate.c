@@ -46,7 +46,7 @@ struct Driver *RB_CrateAny_GetDriver(struct Thread *t, struct ScratchpadStruct *
 	}
 
 	// if driver itself
-	else if (hitModelIDValue == DYNAMIC_PLAYER) // //player model
+	else if ((hitModelIDValue == DYNAMIC_PLAYER) || (hitModelIDValue == DYNAMIC_ROBOT_CAR))
 	{
 		driver = (struct Driver *)t->object;
 
@@ -180,6 +180,33 @@ void RB_CrateAny_ThTick_Grow(struct Thread *t)
 	}
 }
 
+void RB_CrateAny_ThTick_Shrink(struct Thread *t)
+{
+	struct Instance *crateInst;
+	struct Crate *crateObj;
+
+	crateInst = t->inst;
+	crateObj = (struct Crate *)t->object;
+
+	//Keep longer starting cooldown here during shrink
+	crateObj->cooldown = 0x5a;
+
+	if (crateInst->scale.x > 0x0)
+	{
+		crateInst->scale.x -= 0x200;
+		crateInst->scale.y -= 0x200;
+		crateInst->scale.z -= 0x200;
+	}
+	else
+	{
+		crateInst->scale.x = 0x0;
+		crateInst->scale.y = 0x0;
+		crateInst->scale.z = 0x0;
+
+		t->funcThTick = RB_CrateAny_ThTick_Grow;
+	}
+}
+
 static struct Thread *RB_CrateAny_LInC_Birth(struct Instance *crateInst, void *funcThCollide, char *debugName)
 {
 	struct Thread *crateThread;
@@ -230,12 +257,18 @@ int RB_CrateWeapon_ThCollide(struct Thread *crateThread, struct Thread *collidin
 
 		if (crateInst->scale.x == 0x1000)
 		{
-			RB_CrateAny_ExplodeInit(crateInst, 0xfafafa0, true);
+			//RB_CrateAny_ExplodeInit(crateInst, 0xfafafa0, true);
+			crateThread->funcThTick = RB_CrateAny_ThTick_Shrink;
+			PlaySound3D(0x3c, crateInst);
 
 			driver = RB_CrateAny_GetDriver(collidingTh, sps);
 			if ((int)driver == 1)
 			{
 				return 1;
+			}
+			if (RB_Warpball_IsDriverRiding(driver))
+			{
+				return 0;
 			}
 			if ((driver->actionsFlagSet & ACTION_BOT) != 0)
 			{
@@ -355,21 +388,37 @@ int RB_CrateFruit_ThCollide(struct Thread *crateThread, struct Thread *colliding
 
 		if (crateInst->scale.x == 0x1000)
 		{
-			RB_CrateAny_ExplodeInit(crateInst, 0xf2953a0, false);
-
 			driver = RB_CrateAny_GetDriver(collidingTh, sps);
 			if ((int)driver == 1)
 			{
 				return 1;
 			}
+			if (RB_Warpball_IsDriverRiding(driver))
+			{
+				return 0;
+			}
 
-			random = MixRNG_Scramble();
-			newWumpa = random;
+			//RB_CrateAny_ExplodeInit(crateInst, 0xf2953a0, false);
+			crateThread->funcThTick = RB_CrateAny_ThTick_Shrink;
+			PlaySound3D(0x3c, crateInst);
+
+			//random = MixRNG_Scramble();
+			newWumpa = 1;
+			/*
 			if (random < 0)
 			{
 				newWumpa = random + 3;
 			}
 			newWumpa = random + (newWumpa >> 2) * -4 + 5;
+			*/
+
+			// Bots have no pickup HUD; award the fruit directly and avoid
+			// indexing the human push buffers with a bot driver ID.
+			if ((driver->actionsFlagSet & ACTION_BOT) != 0)
+			{
+				RB_Player_ModifyWumpa(driver, newWumpa);
+				return 1;
+			}
 
 			driver->PickupWumpaHUD.cooldown = 5;
 			driver->PickupWumpaHUD.numCollected = newWumpa;

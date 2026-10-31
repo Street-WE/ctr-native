@@ -27,6 +27,9 @@ int NativeRenderer_CaptureVRAMState(void *dst, int dstSize);
 int NativeRenderer_RestoreVRAMState(const void *src, int srcSize);
 TextureID NativeRenderer_GetVRAMTexture(void);
 TextureID NativeRenderer_GetWhiteTexture(void);
+TextureID NativeRenderer_CreateImageTexture(const u8 *rgba, int width, int height);
+void NativeRenderer_ReleaseImageTexture(TextureID texture);
+float NativeRenderer_GetPixelAspect(int width, int height);
 void NativeRenderer_SetBlendMode(BlendMode blendMode);
 void NativeRenderer_SetStencilMode(int drawPrim);
 void NativeRenderer_SetOffscreenState(const RECT16 *offscreenRect, int enable);
@@ -41,5 +44,6 @@ void NativeRenderer_UpdateVertexBuffer(const GrVertex *vertices, int count);
 void NativeRenderer_DrawTriangles(int startVertex, int triangles);
 void NativeRenderer_PushDebugLabel(const char *label);
 void NativeRenderer_PopDebugLabel(void);
+void NativeRenderer_PresentMainRenderTarget(void);
 
 #endif

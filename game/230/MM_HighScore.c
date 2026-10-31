@@ -1,10 +1,12 @@
 #include <common.h>
+#include <LevelRegistry.h>
+#include <HighScoreRegistry.h>
+#include <CharacterIconCache.h>
 
 enum
 {
 	MM_HIGHSCORE_MAIN_TRANSITION_MAX_FRAME = 0xc,
 	MM_HIGHSCORE_SLIDE_TRANSITION_FRAMES = 8,
-	MM_HIGHSCORE_LAST_ARCADE_TRACK = 0x11,
 	MM_HIGHSCORE_TRACK_SLIDE_STEP_X = 0x40,
 	MM_HIGHSCORE_ROW_SLIDE_STEP_Y = 0x1b,
 	MM_HIGHSCORE_OFFSCREEN_X = 0x200,
@@ -46,7 +48,6 @@ enum
 	MM_HIGHSCORE_BEST_LAP_TIME_Y_OFFSET = 0x4a,
 	MM_HIGHSCORE_BEST_LAP_ICON_X_OFFSET = 0x124,
 	MM_HIGHSCORE_BEST_LAP_ICON_Y_OFFSET = 0x38,
-	MM_HIGHSCORE_DRIVER_COLOR_OFFSET = 5,
 	MM_HIGHSCORE_ICON_TRANSPARENCY = 1,
 	MM_HIGHSCORE_ICON_SCALE = 0x1000,
 	MM_HIGHSCORE_VISIBLE_SCORE_ROWS = 5,
@@ -82,9 +83,14 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 	s16 offsetX = (s16)posX;
 	s16 offsetY = (s16)posY;
 
-	s16 levelID = D230.arcadeTracks[trackIndex].levID;
+	s16 trackCount;
+	struct MainMenu_LevelRow *tracks = MM_TrackSelect_GetNativeArcadeTracks(&trackCount);
+	const struct LevelDef *level = MM_TrackSelect_GetNativeLevelDef(trackIndex);
+	s16 levelID = tracks[trackIndex].levID;
 
-	s16 lineWidth = DecalFont_GetLineWidth(sdata->lngStrings[data.metaDataLEV[levelID].name_LNG], FONT_BIG);
+	const struct LevelDef *namedLevel = level != NULL ? level : LevelRegistry_GetReplacement(levelID);
+	char *levelName = namedLevel != NULL ? (char *)namedLevel->name : sdata->lngStrings[data.metaDataLEV[levelID].name_LNG];
+	s16 lineWidth = DecalFont_GetLineWidth(levelName, FONT_BIG);
 	lineWidth = lineWidth >> 1;
 
 	// get color data
@@ -108,7 +114,7 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 	                 colorPtr[2], colorPtr[3], 0, MM_HIGHSCORE_ARROW_SCALE, 0);
 
 	// draw track name
-	DecalFont_DrawLine(sdata->lngStrings[data.metaDataLEV[levelID].name_LNG], titleMeta->currX + (s16)(posX + MM_HIGHSCORE_TITLE_X_OFFSET),
+	DecalFont_DrawLine(levelName, titleMeta->currX + (s16)(posX + MM_HIGHSCORE_TITLE_X_OFFSET),
 	                   titleMeta->currY + (s16)(posY + MM_HIGHSCORE_TITLE_Y_OFFSET), FONT_BIG, JUSTIFY_CENTER);
 
 	Color iconColor = D230.highscore_iconColor;
@@ -117,21 +123,16 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 	                    bestTrackMeta->currY + offsetY + MM_HIGHSCORE_BEST_TRACK_LABEL_Y_OFFSET, FONT_SMALL, 0);
 
 	// first entry: Time Trial or Relic
-	struct HighScoreEntry *entry = &sdata->gameProgress.highScoreTracks[levelID].scoreEntry[rowIndex * MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE];
+	struct HighScoreEntry *entry = &HighScoreRegistry_Get(levelID, level)->scoreEntry[rowIndex * MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE];
 
 	// if Time Trial
 	// with ghost stars, and Best Lap
 	if ((rowIndex & 0xffff) == MM_HIGHSCORE_SCORE_MODE_TIME_TRIAL)
 	{
-		s32 prevLevelID = gGT->levelID;
-
-		gGT->levelID = levelID;
-		GAMEPROG_GetPtrHighScoreTrack();
-
 		// draw ghost stars
-		for (s32 ghostStarIndex = 0; ghostStarIndex < MM_HIGHSCORE_GHOST_STAR_COUNT; ghostStarIndex++)
+		for (s32 ghostStarIndex = 0; level == NULL && ghostStarIndex < MM_HIGHSCORE_GHOST_STAR_COUNT; ghostStarIndex++)
 		{
-			if (((sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags >> D230.highScoreGhostStars.beatenFlagBit[ghostStarIndex]) & 1) != 0)
+			if (((sdata->gameProgress.highScoreTracks[levelID].timeTrialFlags >> D230.highScoreGhostStars.beatenFlagBit[ghostStarIndex]) & 1) != 0)
 			{
 				colorPtr = data.ptrColor[D230.highScoreGhostStars.colorIndex[ghostStarIndex]];
 
@@ -147,16 +148,13 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 			}
 		}
 
-		gGT->levelID = prevLevelID;
-		GAMEPROG_GetPtrHighScoreTrack();
-
 		MM_HighScore_Text3D(sdata->lngStrings[LNG_BEST_LAP_TIME], bestLapLabelMeta->currX + offsetX + MM_HIGHSCORE_BEST_LAP_LABEL_X_OFFSET,
 		                    bestLapLabelMeta->currY + offsetY + MM_HIGHSCORE_BEST_LAP_LABEL_Y_OFFSET, FONT_SMALL, 0);
 
 		// Character Name
 		MM_HighScore_Text3D(entry[0].name, bestLapEntryMeta->currX + offsetX + MM_HIGHSCORE_BEST_LAP_TEXT_X_OFFSET,
 		                    bestLapEntryMeta->currY + offsetY + MM_HIGHSCORE_BEST_LAP_NAME_Y_OFFSET, FONT_BIG,
-		                    entry[0].characterID + MM_HIGHSCORE_DRIVER_COLOR_OFFSET);
+		                    CharacterIconCache_GetNameColor(entry[0].characterID));
 
 		// Draw time string
 		// NOTE(aalhendi): Retail also uses currX as the Y transition base here.
@@ -164,7 +162,7 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 		                    bestLapEntryMeta->currX + offsetY + MM_HIGHSCORE_BEST_LAP_TIME_Y_OFFSET, FONT_SMALL, 0);
 
 		// Character Icon
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[data.MetaDataCharacters[entry[0].characterID].iconID],
+		RECTMENU_DrawPolyGT4(CharacterIconCache_GetHighScore(entry[0].characterID),
 		                     bestLapEntryMeta->currX + offsetX + MM_HIGHSCORE_BEST_LAP_ICON_X_OFFSET,
 		                     bestLapEntryMeta->currY + offsetY + MM_HIGHSCORE_BEST_LAP_ICON_Y_OFFSET, &gGT->backBuffer->primMem, (gGT->pushBuffer_UI).ptrOT,
 		                     ColorCode_GetPacked(&iconColor), ColorCode_GetPacked(&iconColor), ColorCode_GetPacked(&iconColor), ColorCode_GetPacked(&iconColor),
@@ -179,7 +177,7 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 		s32 metaIndex = scoreRowIndex + MM_HIGHSCORE_FIRST_VISIBLE_META_INDEX;
 
 		// Character Icon
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[data.MetaDataCharacters[entry[entryIndex].characterID].iconID],
+		RECTMENU_DrawPolyGT4(CharacterIconCache_GetHighScore(entry[entryIndex].characterID),
 		                     D230.transitionMeta_HighScores[metaIndex].currX + offsetX + MM_HIGHSCORE_SCORE_ICON_X_OFFSET,
 		                     D230.transitionMeta_HighScores[metaIndex].currY + offsetY + (scoreRowIndex * MM_HIGHSCORE_SCORE_ROW_Y_STEP) +
 		                         MM_HIGHSCORE_SCORE_NAME_Y_OFFSET,
@@ -190,7 +188,7 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 		MM_HighScore_Text3D(entry[entryIndex].name, D230.transitionMeta_HighScores[metaIndex].currX + offsetX + MM_HIGHSCORE_SCORE_NAME_X_OFFSET,
 		                    D230.transitionMeta_HighScores[metaIndex].currY + offsetY + (scoreRowIndex * MM_HIGHSCORE_SCORE_ROW_Y_STEP) +
 		                        MM_HIGHSCORE_SCORE_NAME_Y_OFFSET,
-		                    FONT_BIG, entry[entryIndex].characterID + MM_HIGHSCORE_DRIVER_COLOR_OFFSET);
+		                    FONT_BIG, CharacterIconCache_GetNameColor(entry[entryIndex].characterID));
 
 		// draw the Time string
 		MM_HighScore_Text3D(
@@ -205,11 +203,14 @@ void MM_HighScore_Draw(u16 trackIndex, u32 rowIndex, u32 posX, u32 posY)
 	videoBox.x = D230.transitionMeta_HighScores[MM_HIGHSCORE_VIDEO_META_INDEX].currX + offsetX + MM_HIGHSCORE_VIDEO_BOX_X_OFFSET;
 	videoBox.y = D230.transitionMeta_HighScores[MM_HIGHSCORE_VIDEO_META_INDEX].currY + offsetY + MM_HIGHSCORE_VIDEO_BOX_Y_OFFSET;
 
-	MM_TrackSelect_Video_Draw(&videoBox, &D230.arcadeTracks[0], trackIndex, (D230.highScoreTransition.state == EXITING_MENU), 0);
+	MM_TrackSelect_Video_Draw(&videoBox, tracks, trackIndex, (D230.highScoreTransition.state == EXITING_MENU), 0);
 }
 
 void MM_HighScore_Init(void)
 {
+	CharacterIconCache_Init(sdata->gGT);
+	D230.highScoreSelection.currentTrack = 0;
+	D230.highScoreSelection.targetTrack = 0;
 	D230.highScoreTransition.state = ENTERING_MENU;
 	D230.highScoreTransition.mainFrame = MM_HIGHSCORE_MAIN_TRANSITION_MAX_FRAME;
 	D230.highScoreSelection.targetRow = 0;
@@ -222,6 +223,8 @@ void MM_HighScore_Init(void)
 void MM_HighScore_MenuProc(struct RectMenu *menu_unused)
 {
 	(void)menu_unused;
+	s16 trackCount;
+	struct MainMenu_LevelRow *tracks = MM_TrackSelect_GetNativeArcadeTracks(&trackCount);
 	s16 nextFrameCount;
 	RECT wipeRect;
 
@@ -304,11 +307,12 @@ void MM_HighScore_MenuProc(struct RectMenu *menu_unused)
 				do
 				{
 					D230.highScoreSelection.targetTrack = D230.highScoreSelection.targetTrack + 1;
-					if (MM_HIGHSCORE_LAST_ARCADE_TRACK < D230.highScoreSelection.targetTrack)
+					if ((trackCount - 1) < D230.highScoreSelection.targetTrack)
 					{
 						D230.highScoreSelection.targetTrack = 0;
 					}
-					trackOpen = MM_TrackSelect_boolTrackOpen(D230.arcadeTracks + D230.highScoreSelection.targetTrack);
+					trackOpen = MM_TrackSelect_GetNativeLevelDef(D230.highScoreSelection.targetTrack) != NULL ||
+					    MM_TrackSelect_boolTrackOpen(tracks + D230.highScoreSelection.targetTrack);
 				} while (!trackOpen);
 			}
 		}
@@ -322,9 +326,10 @@ void MM_HighScore_MenuProc(struct RectMenu *menu_unused)
 				D230.highScoreSelection.targetTrack = D230.highScoreSelection.targetTrack - 1;
 				if (D230.highScoreSelection.targetTrack < 0)
 				{
-					D230.highScoreSelection.targetTrack = MM_HIGHSCORE_LAST_ARCADE_TRACK;
+					D230.highScoreSelection.targetTrack = (trackCount - 1);
 				}
-				trackOpen = MM_TrackSelect_boolTrackOpen(D230.arcadeTracks + D230.highScoreSelection.targetTrack);
+				trackOpen = MM_TrackSelect_GetNativeLevelDef(D230.highScoreSelection.targetTrack) != NULL ||
+				    MM_TrackSelect_boolTrackOpen(tracks + D230.highScoreSelection.targetTrack);
 			} while (!trackOpen);
 		}
 	}
@@ -381,6 +386,16 @@ LAB_OVR_230__800b3c78:
 			D230.highScoreSelection.currentTrack = D230.highScoreSelection.targetTrack;
 		}
 	}
+
+    struct HighScoreEntry *currentEntries = &HighScoreRegistry_Get(
+        tracks[D230.highScoreSelection.currentTrack].levID,
+        MM_TrackSelect_GetNativeLevelDef(D230.highScoreSelection.currentTrack))->scoreEntry[
+            D230.highScoreSelection.currentRow * MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE];
+    struct HighScoreEntry *targetEntries = &HighScoreRegistry_Get(
+        tracks[D230.highScoreSelection.targetTrack].levID,
+        MM_TrackSelect_GetNativeLevelDef(D230.highScoreSelection.targetTrack))->scoreEntry[
+            D230.highScoreSelection.targetRow * MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE];
+    CharacterIconCache_LoadHighScores(sdata->gGT, currentEntries, targetEntries);
 
 	RECTMENU_DrawSelf(&D230.menuHighScore, D230.transitionMeta_HighScores[MM_HIGHSCORE_MENU_META_INDEX].currX,
 	                  D230.transitionMeta_HighScores[MM_HIGHSCORE_MENU_META_INDEX].currY, MM_HIGHSCORE_MENU_WIDTH);

@@ -1,6 +1,7 @@
 #include <common.h>
 
 #if defined(CTR_NATIVE)
+#include <platform/native_obj.h>
 static void MainFrame_RegisterGpuLinkRanges(struct GameTracker *gGT)
 {
 	static const char *const primLabels[2] = {"db0 prim", "db1 prim"};
@@ -36,6 +37,10 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 			howl_StopAudio(0, 0, 1);
 			howl_UnPauseAudio();
 			sdata->boolSoundPaused = 0;
+			#ifdef CTR_NATIVE
+				NativeAudio_ResumeMusic();
+				NativeAudio_PauseSealLoops(0);
+			#endif
 		}
 	}
 	else if (sdata->boolSoundPaused == 0)
@@ -43,6 +48,10 @@ void MainFrame_TogglePauseAudio(b32 bool_pause)
 		OtherFX_Stop2(1);
 		howl_PauseAudio();
 		sdata->boolSoundPaused = 1;
+		#ifdef CTR_NATIVE
+			NativeAudio_PauseMusic();
+			NativeAudio_PauseSealLoops(1);
+		#endif
 	}
 	return;
 }
@@ -337,6 +346,7 @@ void MainFrame_GameLogic(struct GameTracker *gGT, struct GamepadSystem *gGamepad
 
 #if defined(CTR_NATIVE)
 		BOTS_UpdateGlobals();
+		NativeObj_UpdateWheels();
 #endif
 		GhostTape_WriteMoves(0);
 		gGT->unk1cc4[4] = (u32)(gGT->unk1cc4[4] * 10000) / 0x147e;

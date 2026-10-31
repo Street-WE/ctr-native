@@ -181,6 +181,10 @@ static void VehPhysCrash_Attack_SetReason(struct Driver *driver, u8 reason)
 
 int VehPhysCrash_Attack(struct Driver *driver1, struct Driver *driver2, b32 canPlayFeedback, b32 boolPlayBubblePop)
 {
+	if (RB_Warpball_IsDriverRiding(driver1) || RB_Warpball_IsDriverRiding(driver2))
+	{
+		return 0;
+	}
 	if ((driver1->actionsFlagSet & ACTION_MASK_WEAPON) == 0)
 	{
 		if ((driver2->actionsFlagSet & ACTION_MASK_WEAPON) != 0)
@@ -336,6 +340,11 @@ void VehPhysCrash_AnyTwoCars(struct Thread *thread, struct DriverCollisionSearch
 	struct Thread *otherThread = search->bucket.th;
 	struct Driver *otherDriver = otherThread->object;
 	struct Driver *selfDriver = thread->object;
+
+	if (RB_Warpball_IsDriverRiding(selfDriver) || RB_Warpball_IsDriverRiding(otherDriver))
+	{
+		return;
+	}
 
 	int hitStrength = CTR_MipsSubLo(CTR_MipsAddLo(thread->driverHitRadius, otherThread->driverHitRadius), distance);
 	if (hitStrength <= 0)

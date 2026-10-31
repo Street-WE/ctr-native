@@ -125,6 +125,67 @@ struct ParticleEmitter emSet_Fireball[10] = {[0] =
                                              // null terminator
                                              [9] = {0}};
 
+enum
+{
+	FIREBALL_HOP_MS = 1280,
+	FIREBALL_HOP_HEIGHT = 2000,
+	FIREBALL_WAIT_MS = 2000,
+};
+
+static struct SpawnType2 *RB_Fireball_GetPath(struct Fireball *fire)
+{
+	struct Level *level = sdata->gGT->level1;
+	if (level == NULL || level->ptrSpawnType2 == NULL || fire->pathIndex < 0 ||
+	    fire->pathIndex >= level->numSpawnType2) return NULL;
+	struct SpawnType2 *path = &level->ptrSpawnType2[fire->pathIndex];
+	return path->numCoords > 0 && path->coords.positions != NULL ? path : NULL;
+}
+
+static int RB_Fireball_MovePath(struct Instance *inst, struct Fireball *fire, struct SpawnType2 *path, int elapsed)
+{
+	if (elapsed <= 0) return 0;
+	if (fire->cooldown > 0)
+	{
+		if (elapsed < fire->cooldown)
+		{
+			fire->cooldown -= elapsed;
+			return 0;
+		}
+		elapsed -= fire->cooldown;
+		fire->cooldown = 0;
+	}
+	if (elapsed == 0) return 0;
+	if (fire->hopTime == 0) PlaySound3D(0x81, inst);
+	fire->hopTime += elapsed;
+	if (fire->hopTime > FIREBALL_HOP_MS) fire->hopTime = FIREBALL_HOP_MS;
+	int next = (fire->pathNode + 1) % path->numCoords;
+	SVec3 start = path->coords.positions[fire->pathNode];
+	SVec3 end = path->coords.positions[next];
+	int time = fire->hopTime;
+	for (int axis = 0; axis < 3; axis++)
+	{
+		int from = CTR_VECTOR_DATA(&start)[axis];
+		int delta = (int)CTR_VECTOR_DATA(&end)[axis] - from;
+		inst->matrix.t[axis] = from + (s32)((s64)delta * time / FIREBALL_HOP_MS);
+	}
+	// Join two parabolas at their apex, exactly halfway along the leg.
+	// This also preserves the midpoint peak for nodes at different heights.
+	int apex = (start.y > end.y ? start.y : end.y) + FIREBALL_HOP_HEIGHT;
+	int half = FIREBALL_HOP_MS / 2;
+	int offset = time - half;
+	int base = time <= half ? start.y : end.y;
+	inst->matrix.t[1] = apex - (s32)((s64)(apex - base) * offset * offset / (half * half));
+	fire->velY = (s16)(-(s64)2 * (apex - base) * offset * 32 / (half * half));
+	if (time == FIREBALL_HOP_MS)
+	{
+		CTR_COPY_VEC3(inst->matrix.t, CTR_VECTOR_DATA(&end));
+		fire->pathNode = next;
+		fire->hopTime = 0;
+		fire->cooldown = FIREBALL_WAIT_MS;
+	}
+	return 1;
+}
+
 void RB_Fireball_ThTick(struct Thread *t)
 {
 	struct Instance *fireInst;
@@ -143,7 +204,8 @@ void RB_Fireball_ThTick(struct Thread *t)
 	fireInst = t->inst;
 	fireObj = t->object;
 
-	if (fireObj->cooldown != 0)
+	struct SpawnType2 *path = RB_Fireball_GetPath(fireObj);
+	if (path == NULL && fireObj->cooldown != 0)
 	{
 		fireObj->cooldown -= elapsedTimeMS;
 
@@ -155,31 +217,42 @@ void RB_Fireball_ThTick(struct Thread *t)
 		return;
 	}
 
-	fireInst->flags |= HIDE_MODEL;
+	fireInst->flags &= ~HIDE_MODEL;
 
 	oldVelY = 0;
-	resetPosY = fireInst->instDef->pos.y - 0x440;
+	resetPosY = path == NULL ? fireInst->instDef->pos.y - 0x440 : 0;
+	int moving = path != NULL ? RB_Fireball_MovePath(fireInst, fireObj, path, elapsedTimeMS) : 0;
+	// Hide immediately on landing and throughout the pause between hops.
+	if (path != NULL && (fireObj->cooldown > 0 || !moving))
+	{
+		fireInst->flags |= HIDE_MODEL;
+	}
 
 	// if fireball isn't below the lava,
 	// handle all particle spawning
-	if (fireInst->matrix.t[1] >= resetPosY)
+	if (path != NULL ? moving : fireInst->matrix.t[1] >= resetPosY)
 	{
-		// move based on velocity
 		velY = fireObj->velY;
-		oldVelY = velY;
-		fireInst->matrix.t[1] += (velY * elapsedTimeMS) >> 5;
-
-		// reduce velocity (gravity)
-		velY -= ((elapsedTimeMS * 10) >> 5);
-
-		// terminal velocity
-		if (velY < -200)
+		if (path == NULL)
 		{
-			velY = -200;
-		}
+			// move based on velocity
+			velY = fireObj->velY;
+			oldVelY = velY;
+			fireInst->matrix.t[1] += (velY * elapsedTimeMS) >> 5;
 
-		// set new velY
-		fireObj->velY = velY;
+			// reduce velocity (gravity)
+			velY -= ((elapsedTimeMS * 10) >> 5);
+
+			// terminal velocity
+			if (velY < -200)
+			{
+				velY = -200;
+			}
+
+			// set new velY
+			fireObj->velY = velY;
+
+		}
 
 		// fire particles
 		particle = Particle_Init(0, gGT->iconGroup[0xA], &emSet_Fireball[0]);
@@ -216,7 +289,7 @@ void RB_Fireball_ThTick(struct Thread *t)
 
 	// === rest of movement behavior ===
 
-	fireObj->cycleTimer -= elapsedTimeMS;
+	if (path == NULL) fireObj->cycleTimer -= elapsedTimeMS;
 
 	// if animation is not over
 	if ((fireInst->animFrame + 1) < INSTANCE_GetNumAnimFrames(fireInst, 0))
@@ -231,6 +304,8 @@ void RB_Fireball_ThTick(struct Thread *t)
 		// reset
 		fireInst->animFrame = 0;
 	}
+
+	if (path != NULL) return;
 
 	if ((oldVelY >= 0) && (fireObj->velY < 0))
 	{
@@ -288,27 +363,37 @@ void RB_Fireball_LInB(struct Instance *inst)
 	t->inst = inst;
 	t->funcThCollide = (void *)RB_Fireball_ThCollide;
 
-	inst->scale.x = 0x4000;
-	inst->scale.y = 0x4000;
-	inst->scale.z = 0x4000;
+	//inst->scale.x = 0x4000;
+	//inst->scale.y = 0x4000;
+	//inst->scale.z = 0x4000;
 
 	inst->animFrame = 0;
 	inst->animIndex = 0;
 
 	fireObj = ((struct Fireball *)t->object);
+	memset(fireObj, 0, sizeof(*fireObj));
+	fireObj->pathIndex = -1;
 	fireObj->cycleTimer = 0;
 	fireObj->cooldown = 0;
 	fireObj->rot_unused.x = 0;
 	fireObj->velY = 96;
 	fireObj->direction = 0;
 
-	fireballID = inst->name[strlen(inst->name) - 1] - '0';
+	// Match seals: numeric suffix selects a zero-based instance path.
+	int length = (int)strlen(inst->name);
+	int suffix = length;
+	while (suffix > 0 && inst->name[suffix - 1] >= '0' && inst->name[suffix - 1] <= '9') suffix--;
+	fireballID = suffix == length ? -1 : atoi(inst->name + suffix);
 	fireObj->fireballID = fireballID;
-
-	if ((fireballID & 1) != 0)
+	fireObj->pathIndex = fireballID;
+	struct SpawnType2 *path = RB_Fireball_GetPath(fireObj);
+	if (path != NULL)
 	{
-		// 1.44s, this is a ms-based timer, not a frame-based
-		// counter, so t->cooldownFrameCount is not allowed
+		CTR_COPY_VEC3(inst->matrix.t, CTR_VECTOR_DATA(&path->coords.positions[0]));
+		inst->flags &= ~HIDE_MODEL;
+	}
+	else if (fireballID >= 0 && (fireballID & 1) != 0)
+	{
 		fireObj->cooldown = 1440;
 	}
 }

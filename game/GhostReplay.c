@@ -1,4 +1,6 @@
 #include <common.h>
+#include <CharacterRegistry.h>
+#include <HighScoreRegistry.h>
 
 internal s16 Ghost_LerpRot12(s16 curr, s16 next, u16 t)
 {
@@ -335,6 +337,7 @@ void GhostReplay_Init1(void)
 	}
 
 	struct GhostHeader *gh = MEMPACK_AllocMem(0x3e00);
+	memset(gh, 0, 0x3e00);
 	char *recordBuffer = GHOSTHEADER_GETRECORDBUFFER(gh);
 	sdata->GhostRecording.ptrGhost = gh;
 	sdata->GhostRecording.ptrStartOffset = &recordBuffer[0];
@@ -354,10 +357,30 @@ void GhostReplay_Init1(void)
 		}
 		else
 		{
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
-			void **pointers = ST1_GETPOINTERS(gGT->level1->ptrSpawnType1);
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
+			struct SpawnType1 *spawnType1 = gGT->level1->ptrSpawnType1;
+			gh = NULL;
 
-			gh = ((timeTrialFlags & TT_NTROPY_BEATEN) != 0) ? pointers[ST1_NOXIDE] : pointers[ST1_NTROPY];
+			if (spawnType1 != NULL)
+			{
+				int ghostIndex =
+					((timeTrialFlags & TT_NTROPY_BEATEN) != 0)
+						? ST1_NOXIDE
+						: ST1_NTROPY;
+
+				if (spawnType1->count > ghostIndex)
+				{
+					void **pointers = ST1_GETPOINTERS(spawnType1);
+					gh = pointers[ghostIndex];
+				}
+			}
+		}
+
+		if (gh == NULL)
+		{
+			gh = MEMPACK_AllocMem(sizeof(struct GhostHeader));
+			memset(gh, 0, sizeof(struct GhostHeader));
+
 		}
 
 		recordBuffer = GHOSTHEADER_GETRECORDBUFFER(gh);
@@ -389,7 +412,17 @@ void GhostReplay_Init1(void)
 		ghostDriver->ghostTape = sdata->ptrGhostTape[i];
 
 		s32 charID = data.characterIDs[i + 1];
-		struct Model *model = VehBirth_GetModelByName(data.MetaDataCharacters[charID].name_Debug);
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByID(charID);
+
+		struct Model *model =
+			character != NULL
+				? VehBirth_GetModelByName(
+					character->assetName)
+				: NULL;
+
+		if (model == NULL)
+			continue;
 		struct Instance *inst = INSTANCE_Birth3D(model, model->name, t);
 		t->inst = inst;
 
@@ -452,7 +485,7 @@ void GhostReplay_Init2(void)
 				continue;
 			}
 
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
 			if ((timeTrialFlags & TT_NTROPY_OPEN) == 0)
 			{
 				continue;
@@ -473,7 +506,7 @@ void GhostReplay_Init2(void)
 		s32 characterIndex = ghostID + 1;
 		if (ghostID != 0)
 		{
-			s32 timeTrialFlags = sdata->gameProgress.highScoreTracks[gGT->levelID].timeTrialFlags;
+			s32 timeTrialFlags = HighScoreRegistry_GetActive()->timeTrialFlags;
 			if ((timeTrialFlags & TT_NTROPY_BEATEN) != 0)
 			{
 				characterIndex = ghostID + 2;
@@ -481,9 +514,26 @@ void GhostReplay_Init2(void)
 		}
 
 		s32 characterID = data.characterIDs[characterIndex];
-		struct Model *model = VehBirth_GetModelByName(data.MetaDataCharacters[characterID].name_Debug);
+		const struct CharacterDef *character =
+			CharacterRegistry_GetByID(characterID);
 
-		driver->wheelSize = (characterID != NITROS_OXIDE) ? 0xccc : 0;
+		struct Model *model =
+			character != NULL
+				? VehBirth_GetModelByName(
+					character->assetName)
+				: NULL;
+
+		if (model == NULL)
+			continue;
+
+		if (!CharacterRegistry_HasWheels(characterID))
+		{
+			driver->wheelSize = 0;
+		}
+		else
+		{
+			driver->wheelSize = 0xccc;
+		}
 
 		struct Instance *inst = driver->instSelf;
 		char *name = (ghostID != 0) ? sdata->s_ghost1 : sdata->s_ghost0;

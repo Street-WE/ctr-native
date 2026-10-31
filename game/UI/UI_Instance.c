@@ -1,4 +1,7 @@
 #include <common.h>
+#ifdef CTR_NATIVE
+#include <platform/native_obj.h>
+#endif
 
 enum UIInstanceConstants
 {
@@ -381,6 +384,11 @@ void UI_INSTANCE_InitAll(void)
 	sdata->pushBuffer_DecalMP.ptrOT = gGT->pushBuffer_UI.ptrOT;
 	sdata->pushBuffer_DecalMP.distanceToScreen_PREV = gGT->pushBuffer_UI.distanceToScreen_PREV;
 
+#ifdef CTR_NATIVE
+	struct Model *customFruit = NativeObj_LoadWumpaHUD();
+	if (customFruit != NULL)
+		sdata->gGT->modelPtr[STATIC_FRUITDISP] = customFruit;
+#endif
 	sdata->ptrFruitDisp = (int)UI_INSTANCE_BirthWithThread(STATIC_FRUITDISP, (int)UI_ThTick_CountPickup, UI_HUD_SLOT_FRUIT_MODEL, 1, sdata->ptrPushBufferUI,
 	                                                       (int)rdata.s_fruitdisp);
 

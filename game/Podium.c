@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 enum PodiumConstants
 {
@@ -35,15 +36,18 @@ void Podium_InitModels(struct GameTracker *gGT)
 		case PODIUM_RANK_SECOND:
 		case PODIUM_RANK_THIRD:
 		{
-			u8 characterID = data.characterIDs[driver->driverID];
-			podiumModelIndexArr[rank] = characterID + STATIC_CRASHDANCE;
+			int characterID = data.characterIDs[driver->driverID];
+
+			int podiumCharacterID =	CharacterRegistry_GetDriverPackID(characterID);
+
+			podiumModelIndexArr[rank] =	podiumCharacterID + STATIC_CRASHDANCE;
 
 			if (rank != PODIUM_RANK_FIRST)
 			{
 				break;
 			}
 
-			switch (characterID)
+			switch (podiumCharacterID)
 			{
 			case CRASH_BANDICOOT:
 			case COCO_BANDICOOT:

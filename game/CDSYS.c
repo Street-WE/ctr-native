@@ -655,6 +655,76 @@ int CDSYS_XAGetTrackLength(int categoryID, int xaID)
 }
 
 
+#if defined(CTR_NATIVE)
+int CDSYS_XAPlayWav(const char *relativePath, int *durationTicks)
+{
+	int nativeVol;
+	int shiftedVolume;
+
+	if (durationTicks != NULL)
+	{
+		*durationTicks = 0;
+	}
+
+	if (relativePath == NULL)
+	{
+		return 0;
+	}
+
+	// Loose WAV overrides are supported only by the native asset backend.
+	if (sdata->boolUseDisc != 0)
+	{
+		return 0;
+	}
+
+	nativeVol = sdata->vol_Voice;
+	shiftedVolume = nativeVol << CDSYS_XA_VOLUME_SHIFT;
+
+	if (!NativeAudio_PlayWavFile(
+		    relativePath,
+		    shiftedVolume,
+		    shiftedVolume,
+		    durationTicks))
+	{
+		return 0;
+	}
+
+	/*
+	 * Make the rest of the game treat the WAV exactly like a GAME XA
+	 * voice stream.
+	 */
+	sdata->XA_State = XA_PLAYING;
+	sdata->XA_Playing_Category = CDSYS_XA_TYPE_GAME;
+
+	/*
+	 * A WAV has no real XA index. Keep this valid for code and snapshots
+	 * that expect a non-negative value.
+	 */
+	sdata->XA_Playing_Index = 0;
+
+	sdata->XA_VolumeBitshift = shiftedVolume;
+	sdata->XA_VolumeDeduct = 0;
+	sdata->XA_boolFinished = 0;
+
+	sdata->XA_CurrOffset = 0;
+	sdata->XA_CurrPos = 0;
+	sdata->XA_StartPos = 0;
+	sdata->XA_EndPos = 0;
+
+	sdata->XA_MaxSampleIndex = 0;
+	sdata->XA_MaxSampleNumSaved = 0;
+
+	for (int i = 0; i < CDSYS_XA_MAX_SAMPLE_WINDOW; i++)
+	{
+		sdata->XA_MaxSampleValArr[i] = 0;
+	}
+
+	sdata->XA_MaxSampleVal = 0;
+	sdata->XA_MaxSampleValInArr = 0;
+
+	return 1;
+}
+#endif
 int CDSYS_XAPlay(int categoryID, int xaID)
 {
 	u8 buf1[8];

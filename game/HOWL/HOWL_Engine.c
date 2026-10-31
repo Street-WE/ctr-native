@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 // Initialize car engine audio system for one driver
 b32 EngineAudio_InitOnce(u32 soundID, u32 flags)
@@ -138,7 +139,7 @@ void EngineSound_Player(struct Driver *driver)
 	u32 volume;
 	u32 distortion;
 	u32 lr;
-	int engine = data.MetaDataCharacters[data.characterIDs[id]].engineID;
+	int engine = CharacterRegistry_GetEngineClass(data.characterIDs[id]);
 
 	if (driver->engineSoundMode == ENGINE_SOUND_FADE_OUT)
 	{

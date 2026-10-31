@@ -624,6 +624,21 @@ void CS_Podium_Prize_Init(u32 prizeModel, const char *prizeName, const SVec3Slot
 	}
 }
 
+void CS_Podium_SkipScene_Init(void)
+{
+	// Do not hide/freeze the driver, disable the HUD,
+	// enable confetti, spawn models, or play podium music.
+	D233.isCutsceneOver = 0;
+	D233.cutsceneState = CS_WAIT_INPUT;
+	D233.bossCutsceneIndex = -1;
+
+	PROC_BirthWithObject(
+		SIZE_RELATIVE_POOL_BUCKET(0, NONE, SMALL, CAMERA),
+		CS_Camera_ThTick_PodiumSkip,
+		R233.s_victorycam,
+		NULL);
+}
+
 void CS_Podium_FullScene_Init(void)
 {
 	struct Instance *driverInstSelf;

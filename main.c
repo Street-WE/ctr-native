@@ -61,6 +61,7 @@
 #include "platform/native_platform.c"
 #include "platform/native_replay_scheduler.c"
 #include "platform/native_renderer.c"
+#include "platform/native_obj.c"
 #include "platform/native_savestate.c"
 #include "platform/native_state.c"
 #include "platform/native_str.c"
@@ -183,13 +184,14 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-#ifdef USE_16BY9
-	printf("[CTR Native] Widescreen\n");
-	Platform_Init("Crash Team Racing", 1280, 720);
-#else
+//ifdef USE_16BY9
+	//printf("[CTR Native] Widescreen\n");
+	//Platform_Init("Crash Team Racing", 1920, 1080);
+	//NativeRenderer_SetPresentationAspect(4, 3);
+//else
 	printf("[CTR Native] 4:3\n");
 	Platform_Init("Crash Team Racing", 800, 600);
-#endif
+//endif
 
 #if defined(CTR_INTERNAL)
 	if (NativePerf_ConfigureFromArgs(argc, argv) != 0)

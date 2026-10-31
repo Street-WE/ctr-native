@@ -314,8 +314,11 @@ void INSTANCE_LevInitAll(struct InstDef *levInstDef, int numInst)
 
 		modelID = levInstDef->model->id;
 
+		// Named custom hazards also work with type 0 (NOFUNC).
+		b32 swinging = (gGT->gameMode2 & NO_LEV_INSTANCE) == 0 && RB_Swinging_LInB(inst);
+
 		// can be -1
-		if ((s16)modelID > 0)
+		if (!swinging && (s16)modelID > 0)
 		{
 			// Only continue if LEV instances are enabled,
 			// they may be disabled due to podium scene on adv hub
@@ -398,6 +401,11 @@ void INSTANCE_LevDelayedLInBs(struct InstDef *instDef, int numInstances)
 {
 	for (int i = 0; i < numInstances; i++)
 	{
+		if (RB_Swinging_LInB(instDef->ptrInstance))
+		{
+			instDef++;
+			continue;
+		}
 		struct MetaDataMODEL *meta = COLL_LevModelMeta(instDef->model->id);
 
 		if ((meta != NULL) && (meta->LInB != NULL))

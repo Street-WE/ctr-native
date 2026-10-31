@@ -1,4 +1,6 @@
 #include <common.h>
+#include <CharacterRegistry.h>
+#include <LevelRegistry.h>
 
 #ifdef CTR_NATIVE
 static void MainInit_InitVisMemBspListNodes(struct VisMem *visMem, struct mesh_info *mesh)
@@ -82,6 +84,14 @@ static int MainInit_GetPrimMemSize(struct GameTracker *gGT)
 {
 	int levelID;
 
+#if defined(CTR_NATIVE)
+	int overrideSize = LevelRegistry_GetPrimMemSize(gGT->levelID);
+	if (overrideSize != 0)
+	{
+		return overrideSize;
+	}
+#endif
+
 	// adv garage
 	if (gGT->levelID == ADVENTURE_GARAGE)
 	{
@@ -156,6 +166,9 @@ void MainInit_PrimMem(struct GameTracker *gGT)
 
 void MainInit_JitPoolsReset(struct GameTracker *gGT)
 {
+#ifdef CTR_NATIVE
+	NativeAudio_StopSealLoops();
+#endif
 	JitPool_Clear(&gGT->JitPools.thread);
 	JitPool_Clear(&gGT->JitPools.instance);
 	JitPool_Clear(&gGT->JitPools.smallStack);
@@ -390,13 +403,32 @@ void MainInit_Drivers(struct GameTracker *gGT)
 		GhostTape_Start();
 
 #if defined(CTR_NATIVE)
-		struct Model **humanPlyrDriverModel = &gGT->threadBuckets[PLAYER].thread->inst->model;
+    struct Thread *humanThread =
+        gGT->threadBuckets[PLAYER].thread;
 
-		// that's characterIDs[1] from the MPK
-		// humanGhost = *humanPlyrDriverModel,
+    if ((humanThread != NULL) &&
+        (humanThread->inst != NULL))
+    {
+        int characterID = data.characterIDs[0];
 
-		// then replace with intended P1 model
-		*humanPlyrDriverModel = data.driverModelExtras[0].model;
+        const struct CharacterDef *character =
+			CharacterRegistry_GetByID(characterID);
+
+		struct Model *selectedModel = NULL;
+
+		if (character != NULL)
+		{
+			selectedModel =
+				VehBirth_GetModelByName(
+					character->assetName);
+		}
+
+        if (selectedModel != NULL)
+        {
+            humanThread->inst->model =
+                selectedModel;
+        }
+    }
 #endif
 	}
 }
@@ -532,8 +564,8 @@ void MainInit_FinalizeInit(struct GameTracker *gGT)
 
 	if (gGT->levelID == MAIN_MENU_LEVEL)
 	{
-		// 30 seconds
-		gGT->demoCountdownTimer = 900;
+		// 300 seconds
+		gGT->demoCountdownTimer = 9000;
 	}
 
 	// copy InstDef to InstancePool
@@ -638,7 +670,8 @@ void MainInit_FinalizeInit(struct GameTracker *gGT)
 		// 0
 		if (gGT->podiumRewardID != NOFUNC)
 		{
-			CS_Podium_FullScene_Init();
+			//CS_Podium_FullScene_Init();
+			CS_Podium_SkipScene_Init();
 		}
 	}
 

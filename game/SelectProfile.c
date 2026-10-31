@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterIconCache.h>
 
 void SelectProfile_QueueLoadHub_MenuProc(struct RectMenu *menu)
 {
@@ -135,7 +136,7 @@ void SelectProfile_DrawAdvProfile(struct AdvProgress *adv, int posX, int posY, s
 		percentColor = WHITE;
 	}
 
-	slotIndex *= 3;
+	int rewardIconIndex = slotIndex * 3;
 	GAMEPROG_AdvPercent(adv);
 
 	if (adv->characterID < 0)
@@ -146,10 +147,15 @@ void SelectProfile_DrawAdvProfile(struct AdvProgress *adv, int posX, int posY, s
 	{
 		int profileTextColor = JUSTIFY_RIGHT | numberColor;
 		int characterID = adv->characterID;
-		int iconID = data.MetaDataCharacters[characterID].iconID;
 		struct SelectProfileLoadSaveObj *obj = (struct SelectProfileLoadSaveObj *)sdata->ptrLoadSaveObj;
 
-		RECTMENU_DrawPolyGT4(gGT->ptrIcons[iconID], posX + 10, posY + 6, &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT, iconColor, iconColor, iconColor,
+#ifdef CTR_NATIVE
+		struct Icon *portrait = CharacterIconCache_GetAdventureProfile(gGT, characterID, slotIndex);
+#else
+		struct Icon *portrait = gGT->ptrIcons[data.MetaDataCharacters[characterID].iconID];
+#endif
+		if (portrait != NULL)
+			RECTMENU_DrawPolyGT4(portrait, posX + 10, posY + 6, &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT, iconColor, iconColor, iconColor,
 		                     iconColor, 1, 0x1000);
 
 		DecalFont_DrawLine(adv->name, posX + 0x6c, posY + 0x29, FONT_BIG, JUSTIFY_CENTER | nameColor);
@@ -161,9 +167,9 @@ void SelectProfile_DrawAdvProfile(struct AdvProgress *adv, int posX, int posY, s
 
 		DecalFont_DrawLine((char *)&sdata->s_percent_sign, posX + 0x70, posY + 0x17, FONT_BIG, percentColor);
 
-		SelectProfile_DrawAdvProfile_UpdateIcon(obj, slotIndex, posX + 0xc3, posY + 0x1f);
-		SelectProfile_DrawAdvProfile_UpdateIcon(obj, slotIndex + 1, posX + 0x78, posY + 0xd);
-		SelectProfile_DrawAdvProfile_UpdateIcon(obj, slotIndex + 2, posX + 0xc3, posY + 0xd);
+		SelectProfile_DrawAdvProfile_UpdateIcon(obj, rewardIconIndex, posX + 0xc3, posY + 0x1f);
+		SelectProfile_DrawAdvProfile_UpdateIcon(obj, rewardIconIndex + 1, posX + 0x78, posY + 0xd);
+		SelectProfile_DrawAdvProfile_UpdateIcon(obj, rewardIconIndex + 2, posX + 0xc3, posY + 0xd);
 	}
 
 	profileRect.x = posX;
@@ -283,7 +289,7 @@ void SelectProfile_Init(u16 flags)
 					slot = i % 3;
 
 					inst->flags |= HIDE_MODEL | SCREENSPACE_INSTANCE;
-					if (slot != 1)
+					if ((slot != 1) && (model->id != -1))
 					{
 						inst->flags |= USE_SPECULAR_LIGHT;
 					}
@@ -1360,7 +1366,8 @@ static void SelectProfile_FinalizeAdventure(struct RectMenu *menu)
 		sdata->advProfileIndex = menu->rowSelected;
 		// NOTE(aalhendi): Retail 0x8004a75c-0x8004a778 queues new Adventure through currLEV.
 		gGT->currLEV = N_SANITY_BEACH;
-		Garage_Leave();
+		if (gGT->levelID == ADVENTURE_GARAGE)
+			Garage_Leave();
 		sdata->ptrDesiredMenu = QueueLoadTrack_GetMenuPtr();
 		return;
 	}

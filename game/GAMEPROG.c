@@ -1,4 +1,5 @@
 #include <common.h>
+#include <HighScoreRegistry.h>
 
 void GAMEPROG_AdvPercent(struct AdvProgress *adv)
 {
@@ -301,5 +302,5 @@ void GAMEPROG_GetPtrHighScoreTrack(void)
 	s32 gameMode1 = gGT->gameMode1;
 
 	sdata->ptrActiveHighScoreEntry =
-	    &sdata->gameProgress.highScoreTracks[gGT->levelID].scoreEntry[MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE * ((gameMode1 & RELIC_RACE) != 0)];
+	    &HighScoreRegistry_GetActive()->scoreEntry[MEMCARD_HIGH_SCORE_ENTRIES_PER_MODE * ((gameMode1 & RELIC_RACE) != 0)];
 }

@@ -1,18 +1,11 @@
 #include <common.h>
+#include <VehExhaust.h>
 
 enum
 {
 	TURBO_FIRE_SIZE_MIN = 4,
 	TURBO_FIRE_SIZE_MAX = 8,
 	TURBO_FIRE_MATRIX_SCALE_SHIFT = 3,
-	TURBO_FIRE_LEFT_X_NUMERATOR = 9,
-	TURBO_FIRE_LEFT_X_SHIFT = 0xb,
-	TURBO_FIRE_RIGHT_X_NUMERATOR = -0x12,
-	TURBO_FIRE_RIGHT_X_SHIFT = 0xc,
-	TURBO_FIRE_Y_NUMERATOR = 3,
-	TURBO_FIRE_Y_SHIFT = 8,
-	TURBO_FIRE_Z_NUMERATOR = -0x34,
-	TURBO_FIRE_Z_SHIFT = 0xc,
 	TURBO_COOLDOWN_SIGN_SCALE = 0x10000,
 	TURBO_ALPHA_RUMBLE_THRESHOLD = 2500,
 	TURBO_RUMBLE_FRAMES = 4,
@@ -40,64 +33,92 @@ void VehTurbo_ProcessBucket(struct Thread *turboThread)
 {
 	while (turboThread != NULL)
 	{
-		struct Instance *primaryInst = turboThread->inst;
-		struct Turbo *turbo = (struct Turbo *)turboThread->object;
-		struct Instance *secondaryInst = turbo->inst;
-		struct Instance *driverInst = turbo->driver->instSelf;
-
-		struct InstDrawPerPlayer *primary = INST_GETIDPP(primaryInst);
-		struct InstDrawPerPlayer *secondary = INST_GETIDPP(secondaryInst);
-		struct InstDrawPerPlayer *driver = INST_GETIDPP(driverInst);
-
-		for (int i = 0; i < sdata->gGT->numPlyrCurrGame; i++)
+		struct Turbo *turbo = turboThread->object;
+		for (int outlet = 0; outlet < VEH_EXHAUST_MAX_OUTLETS; outlet++)
 		{
-			if ((driver->instFlags & PUSHBUFFER_EXISTS) == 0)
+			struct Instance *flame = VehExhaust_GetFlame(turboThread, outlet);
+			if (flame == NULL) continue;
+			struct InstDrawPerPlayer *draw = INST_GETIDPP(flame);
+			struct InstDrawPerPlayer *driver = INST_GETIDPP(turbo->driver->instSelf);
+			for (int i = 0; i < sdata->gGT->numPlyrCurrGame; i++, draw++, driver++)
 			{
-				u32 driverDrawFlag = driver->instFlags | ~DRAW_SUCCESSFUL;
-
-				secondary->instFlags &= driverDrawFlag;
-				primary->instFlags &= driverDrawFlag;
-
-				secondary->otRangeNormal = driver->otRangeNormal;
-				primary->otRangeNormal = driver->otRangeNormal;
-				secondary->otRangeSecondary = driver->otRangeSecondary;
-				primary->otRangeSecondary = driver->otRangeSecondary;
-
-				secondary->depthOffset[0] = driver->depthOffset[0];
-				primary->depthOffset[0] = driver->depthOffset[0];
-				secondary->depthOffset[1] = driver->depthOffset[1];
-				primary->depthOffset[1] = driver->depthOffset[1];
+				if ((driver->instFlags & PUSHBUFFER_EXISTS) == 0)
+				{
+					draw->instFlags &= driver->instFlags | ~DRAW_SUCCESSFUL;
+					draw->otRangeNormal = driver->otRangeNormal;
+					draw->otRangeSecondary = driver->otRangeSecondary;
+					draw->depthOffset[0] = driver->depthOffset[0];
+					draw->depthOffset[1] = driver->depthOffset[1];
+				}
 			}
-
-			primary++;
-			secondary++;
-			driver++;
 		}
-
 		turboThread = turboThread->siblingThread;
 	}
 }
 
 void VehTurbo_ThDestroy(struct Thread *t)
 {
-	struct Turbo *turboObj = t->object;
-	struct Driver *d = turboObj->driver;
-	d->actionsFlagSet &= ~ACTION_TURBO_ITEM;
-
-	INSTANCE_Death(turboObj->inst);
-	INSTANCE_Death(t->inst);
+	struct Turbo *turbo = t->object;
+	turbo->driver->actionsFlagSet &= ~ACTION_TURBO_ITEM;
+	for (int i = VEH_EXHAUST_MAX_OUTLETS - 1; i >= 0; i--)
+	{
+		struct Instance *flame = VehExhaust_GetFlame(t, i);
+		if (flame != NULL) INSTANCE_Death(flame);
+	}
 }
 
-static void VehTurbo_TransformOffset(struct Instance *driverInst, s16 x, s16 y, s16 z, s32 *out)
+static void VehTurbo_PositionFlame(struct Instance *kart, struct Instance *flame,
+    const struct ExhaustOutlet *outlet, int fireSize)
 {
-	SVECTOR offset = {x, y, z, 0};
-
-	// NOTE(aalhendi): Native expression of retail VXY0/VZ0 loads before gte_rt.
-	gte_SetRotMatrix(&driverInst->matrix.m[0][0]);
-	gte_SetTransMatrix(&driverInst->matrix.m[0][0]);
+	MATRIX rotation;
+	SVECTOR offset;
+	VehExhaust_GetRotation(outlet, kart, &rotation);
+	int scale = VehExhaust_GetScale(outlet->flameScale);
+	for (int row = 0; row < 3; row++)
+	{
+		for (int col = 0; col < 3; col++)
+		{
+			int component = rotation.m[row][col];
+			if (col == 0 && outlet->mirrorFlame) component = -component;
+			flame->matrix.m[row][col] = (s16)(((component * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT) * scale) / 256);
+		}
+	}
+	VehExhaust_GetLocalPosition(outlet, kart, true, &offset);
+	gte_SetRotMatrix(&kart->matrix);
+	gte_SetTransMatrix(&kart->matrix);
 	CTR_GteLoadSV0(&offset);
 	gte_rt();
-	CTR_GteStoreIR(out);
+	CTR_GteStoreIR(&flame->matrix.t[0]);
+}
+
+static void VehTurbo_UpdateFlames(struct Thread *turboThread, const struct ExhaustTemplate *layout)
+{
+	struct Turbo *turbo = turboThread->object;
+	struct Instance *instanceDriver = turbo->driver->instSelf;
+	int outletCount = VehExhaust_GetCount(layout);
+	int fireSize = turbo->fireSize;
+	if (fireSize > TURBO_FIRE_SIZE_MAX) fireSize = TURBO_FIRE_SIZE_MAX;
+	if (fireSize < TURBO_FIRE_SIZE_MIN) fireSize = TURBO_FIRE_SIZE_MIN;
+
+	for (int i = 0; i < VEH_EXHAUST_MAX_OUTLETS; i++)
+	{
+		struct Instance *flame = VehExhaust_GetFlame(turboThread, i);
+		if (flame == NULL) continue;
+		flame->flags = (flame->flags & ~(SPLIT_LINE | REFLECTIVE)) |
+		    (instanceDriver->flags & (SPLIT_LINE | REFLECTIVE));
+		if (instanceDriver->flags & (SPLIT_LINE | REFLECTIVE))
+			flame->vertSplit = instanceDriver->vertSplit;
+		if (i < outletCount)
+			VehTurbo_PositionFlame(instanceDriver, flame, &layout->outlets[i], fireSize);
+		if (turbo->fireVisibilityCooldown == 0 && i < outletCount &&
+		    VehExhaust_GetScale(layout->outlets[i].flameScale) != 0)
+			flame->flags &= ~HIDE_MODEL;
+		else
+			flame->flags |= HIDE_MODEL;
+		int frame = (turbo->fireAnimIndex + i * TURBO_SECONDARY_MODEL_FRAME_OFFSET) & TURBO_ANIM_FRAME_MASK;
+		flame->model = sdata->gGT->modelPtr[frame + STATIC_TURBO_EFFECT];
+	}
+
 }
 
 void VehTurbo_ThTick(struct Thread *turboThread)
@@ -123,82 +144,6 @@ void VehTurbo_ThTick(struct Thread *turboThread)
 		instanceDriver->alphaScale = instanceDriver->alphaScale >> 1;
 	}
 
-	// if instance is not split by water
-	if ((instanceDriver->flags & SPLIT_LINE) == 0)
-	{
-		// instance flags
-		instance->flags &= ~SPLIT_LINE;
-		turbo->inst->flags &= ~SPLIT_LINE;
-	}
-
-	// if instance is split by water
-	else
-	{
-		// turbos are now split by water, set vertical split height
-		instance->flags |= SPLIT_LINE;
-		instance->vertSplit = instanceDriver->vertSplit;
-		turbo->inst->flags |= SPLIT_LINE;
-		turbo->inst->vertSplit = instanceDriver->vertSplit;
-	}
-
-	// if driver instance is not reflective
-	if ((instanceDriver->flags & REFLECTIVE) == 0)
-	{
-		// remove reflection from turbo instances
-		instance->flags &= ~REFLECTIVE;
-		turbo->inst->flags &= ~REFLECTIVE;
-	}
-
-	// if driver instance is reflective
-	else
-	{
-		// make turbo instances reflective
-		// copy reflection height axis to instance
-		instance->flags |= REFLECTIVE;
-		instance->vertSplit = instanceDriver->vertSplit;
-		turbo->inst->flags |= REFLECTIVE;
-		turbo->inst->vertSplit = instanceDriver->vertSplit;
-	}
-
-	int fireSize = (int)turbo->fireSize;
-	if (TURBO_FIRE_SIZE_MAX < (int)turbo->fireSize)
-	{
-		fireSize = TURBO_FIRE_SIZE_MAX;
-	}
-	if ((int)turbo->fireSize < TURBO_FIRE_SIZE_MIN)
-	{
-		fireSize = TURBO_FIRE_SIZE_MIN;
-	}
-
-	// matrix of first turbo instance
-	instance->matrix.m[0][0] = (s16)(instanceDriver->matrix.m[0][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[0][1] = (s16)(instanceDriver->matrix.m[0][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[0][2] = (s16)(instanceDriver->matrix.m[0][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[1][0] = (s16)(instanceDriver->matrix.m[1][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[1][1] = (s16)(instanceDriver->matrix.m[1][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[1][2] = (s16)(instanceDriver->matrix.m[1][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[2][0] = (s16)(instanceDriver->matrix.m[2][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[2][1] = (s16)(instanceDriver->matrix.m[2][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	instance->matrix.m[2][2] = (s16)(instanceDriver->matrix.m[2][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-
-	VehTurbo_TransformOffset(instanceDriver, instanceDriver->scale.x * TURBO_FIRE_LEFT_X_NUMERATOR >> TURBO_FIRE_LEFT_X_SHIFT,
-	                         instanceDriver->scale.y * TURBO_FIRE_Y_NUMERATOR >> TURBO_FIRE_Y_SHIFT,
-	                         instanceDriver->scale.z * TURBO_FIRE_Z_NUMERATOR >> TURBO_FIRE_Z_SHIFT, &instance->matrix.t[0]);
-
-	// matrix of second turbo instance, negate X axis
-	turbo->inst->matrix.m[0][0] = (s16)(-(int)instanceDriver->matrix.m[0][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[0][1] = (s16)(instanceDriver->matrix.m[0][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[0][2] = (s16)(instanceDriver->matrix.m[0][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[1][0] = (s16)(-(int)instanceDriver->matrix.m[1][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[1][1] = (s16)(instanceDriver->matrix.m[1][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[1][2] = (s16)(instanceDriver->matrix.m[1][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[2][0] = (s16)(-(int)instanceDriver->matrix.m[2][0] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[2][1] = (s16)(instanceDriver->matrix.m[2][1] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-	turbo->inst->matrix.m[2][2] = (s16)(instanceDriver->matrix.m[2][2] * fireSize >> TURBO_FIRE_MATRIX_SCALE_SHIFT);
-
-	VehTurbo_TransformOffset(instanceDriver, instanceDriver->scale.x * TURBO_FIRE_RIGHT_X_NUMERATOR >> TURBO_FIRE_RIGHT_X_SHIFT,
-	                         instanceDriver->scale.y * TURBO_FIRE_Y_NUMERATOR >> TURBO_FIRE_Y_SHIFT,
-	                         instanceDriver->scale.z * TURBO_FIRE_Z_NUMERATOR >> TURBO_FIRE_Z_SHIFT, &turbo->inst->matrix.t[0]);
 
 	// decrease turbo visibility cooldown by elapsed milliseconds per frame, ~32
 	s16 elapsedTime = turbo->fireVisibilityCooldown - gGT->elapsedTimeMS;
@@ -210,12 +155,8 @@ void VehTurbo_ThTick(struct Thread *turboThread)
 		turbo->fireVisibilityCooldown = 0;
 	}
 
-	if (turbo->fireVisibilityCooldown == 0)
-	{
-		// make fire visible now that there's no cooldown
-		instance->flags &= ~HIDE_MODEL;
-		turbo->inst->flags &= ~HIDE_MODEL;
-	}
+	VehTurbo_UpdateFlames(turboThread,
+	    VehExhaust_GetTemplate(data.characterIDs[driver->driverID]));
 
 	if (instance->alphaScale < TURBO_ALPHA_RUMBLE_THRESHOLD)
 	{
@@ -223,20 +164,6 @@ void VehTurbo_ThTick(struct Thread *turboThread)
 		GAMEPAD_ShockFreq(driver, TURBO_RUMBLE_FRAMES, TURBO_RUMBLE_FORCE);
 	}
 
-	// set new model pointer, one of eight
-	instance->model = gGT->modelPtr[(int)turbo->fireAnimIndex + STATIC_TURBO_EFFECT];
-
-	// set new model pointer, one of eight
-
-	// STATIC_TURBO_EFFECT
-	// STATIC_TURBO_EFFECT1
-	// STATIC_TURBO_EFFECT2
-	// STATIC_TURBO_EFFECT3
-	// STATIC_TURBO_EFFECT4
-	// STATIC_TURBO_EFFECT5
-	// STATIC_TURBO_EFFECT6
-	// STATIC_TURBO_EFFECT7
-	turbo->inst->model = gGT->modelPtr[(((int)turbo->fireAnimIndex + TURBO_SECONDARY_MODEL_FRAME_OFFSET) & TURBO_ANIM_FRAME_MASK) + STATIC_TURBO_EFFECT];
 
 	turbo->fireAnimIndex++;
 
@@ -321,13 +248,11 @@ void VehTurbo_ThTick(struct Thread *turboThread)
 			{
 				// increase transparency
 				instance->alphaScale += TURBO_FADE_FAST_STEP;
-				turbo->inst->alphaScale += TURBO_FADE_FAST_STEP;
 			}
 			else
 			{
 				// increase transparency
 				instance->alphaScale += TURBO_FADE_SLOW_STEP;
-				turbo->inst->alphaScale += TURBO_FADE_SLOW_STEP;
 			}
 		}
 		else
@@ -367,6 +292,13 @@ void VehTurbo_ThTick(struct Thread *turboThread)
 
 		// 0x800 = this thread needs to be deleted
 		turboThread->flags |= THREAD_FLAG_DEAD;
+	}
+
+	// All outlets follow the primary instance's shared fade state.
+	for (int i = 1; i < VEH_EXHAUST_MAX_OUTLETS; i++)
+	{
+		struct Instance *flame = VehExhaust_GetFlame(turboThread, i);
+		if (flame != NULL) flame->alphaScale = instance->alphaScale;
 	}
 
 	// do not use infinite loop optimization,

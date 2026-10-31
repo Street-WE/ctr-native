@@ -1,5 +1,28 @@
 #include <common.h>
 
+#if defined(CTR_NATIVE)
+#include <LevelRegistry.h>
+#include <platform/native_audio.h>
+
+static void Audio_NativeMusic_StartRace(struct GameTracker *gGT)
+{
+	const char *musicPath;
+	int volume;
+
+	if (gGT == NULL)
+		return;
+
+	musicPath = LevelRegistry_GetMusic(gGT->levelID);
+	if (musicPath == NULL)
+		return;
+
+	CseqMusic_StopAll();
+	Music_End();
+	volume = sdata->vol_Music << CDSYS_XA_VOLUME_SHIFT;
+	NativeAudio_PlayMusicWav(musicPath, volume, volume);
+}
+#endif
+
 void Audio_SetState(u32 state)
 {
 	u8 XA_type;
@@ -55,6 +78,9 @@ void Audio_SetState(u32 state)
 		Music_Stop();
 
 		CseqMusic_StopAll();
+#if defined(CTR_NATIVE)
+		NativeAudio_StopMusic();
+#endif
 		break;
 	case AUDIO_RACING:
 
@@ -63,6 +89,9 @@ void Audio_SetState(u32 state)
 		sdata->framesDrivingSameDirection = 0;
 
 		Voiceline_ToggleEnable(1);
+#if defined(CTR_NATIVE)
+		Audio_NativeMusic_StartRace(gGT);
+#endif
 		break;
 
 	case AUDIO_PRE_LAST_LAP:
@@ -98,6 +127,10 @@ void Audio_SetState(u32 state)
 		break;
 	case AUDIO_RACE_END:
 		sdata->boolNeedXASeek = 0;
+
+#if defined(CTR_NATIVE)
+		NativeAudio_StopMusic();
+#endif
 
 		Music_Restart();
 

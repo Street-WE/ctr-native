@@ -164,12 +164,18 @@ struct TrackerWeapon
 	// 0x54
 	int framesSeekTargetTnt;
 
-	// 0x58 bytes large
+	// 0x58
+	int orbTimeAlive;
+
+	// 0x5c
+	u16 store_wheelsize;
+
+	// 0x60 bytes large
 };
 CTR_STATIC_ASSERT(offsetof(struct TrackerWeapon, pathProgress) == 0x2c);
 CTR_STATIC_ASSERT(offsetof(struct TrackerWeapon, savedPosXY) == 0x4c);
 CTR_STATIC_ASSERT(offsetof(struct TrackerWeapon, savedPosZ) == 0x50);
-CTR_STATIC_ASSERT(sizeof(struct TrackerWeapon) == 0x58);
+CTR_STATIC_ASSERT(sizeof(struct TrackerWeapon) == 0x60);
 
 struct RainLocal
 {
@@ -484,10 +490,13 @@ struct Fireball
 	// unused
 	s16 direction;
 
-	// 0x10 bytes large
+	s32 pathIndex;
+	s32 pathNode;
+	s32 hopTime;
+	// 0x1c bytes large
 };
 CTR_STATIC_ASSERT(offsetof(struct Fireball, rot_unused) == 0x6);
-CTR_STATIC_ASSERT(sizeof(struct Fireball) == 0x10);
+CTR_STATIC_ASSERT(sizeof(struct Fireball) == 0x1c);
 
 struct FlameJet
 {
@@ -653,7 +662,7 @@ struct Seal
 	SVec3 rotDesired;
 
 	// 0x1e
-	s16 direction;
+	s16 direction; // destination index on the looping path
 
 	// 0x20
 	SVec3 turnAroundRot;
@@ -665,11 +674,23 @@ struct Seal
 	SVec3 vel;
 	s16 padding2e;
 
-	// 0x30 bytes large
+	s32 segmentFrames;
+	s32 speedQ8;
+
+	// 0x38 bytes large, including native path timing
 };
 CTR_STATIC_ASSERT(offsetof(struct Seal, endPos) == 0x8);
 CTR_STATIC_ASSERT(offsetof(struct Seal, turnAroundRot) == 0x20);
-CTR_STATIC_ASSERT(sizeof(struct Seal) == 0x30);
+CTR_STATIC_ASSERT(sizeof(struct Seal) == 0x38);
+
+enum { SEAL_TRAIL_GHOST_COUNT = 4 };
+
+// Separate child-thread state keeps the original seal object's layout intact.
+struct SealTrail
+{
+	struct Instance *ghosts[SEAL_TRAIL_GHOST_COUNT];
+	u32 sampleTicks;
+};
 
 struct Snowball
 {

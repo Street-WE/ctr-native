@@ -1,4 +1,6 @@
 #include <common.h>
+#include <platform/native_obj.h>
+#include <math.h>
 
 
 struct RenderBucketEntry
@@ -1244,6 +1246,24 @@ static struct ModelHeader *RenderBucket_SelectModelHeader(struct Instance *inst,
 	headersRemaining = inst->model->numHeaders;
 	lodIndex = 0;
 
+#ifdef CTR_NATIVE
+	// Optional trace is flushed by Platform_Log so the last entry survives
+	// a fault while reading a model header.
+	{
+		static int traceModelLod = -1;
+		if (traceModelLod < 0)
+		{
+			const char *trace = getenv("CTR_TRACE_MODEL_LOD");
+			traceModelLod = (trace != NULL && trace[0] == '1');
+		}
+		if (traceModelLod)
+		{
+			Platform_Log("[LOD trace] inst=%p name=%.16s model=%p headers=%p count=%d depth=%d\n",
+			             (void *)inst, inst->name, (void *)inst->model, (void *)mh, headersRemaining, viewDepth);
+		}
+	}
+#endif
+
 	// NOTE(aalhendi): Retail 0x80070ae4-0x80070b34 uses transformed GTE depth,
 	// GTE H, and a post-decrement s4/s5 header walk. Native keeps the same
 	// comparison and walk as explicit C state.
@@ -2072,6 +2092,12 @@ static struct RenderBucketEntry *RenderBucket_QueueDraw(struct Instance *inst, s
 
 	idpp->mh = mh;
 	idpp->lodIndex = lodIndex;
+	if (mh->unk1 == NATIVE_OBJ_MODEL_MAGIC)
+	{
+		// OBJ vertices are already unpacked. Retail split handlers store a
+		// different MVP for their decoder; use the ordinary rigid transform.
+		queuedFlags &= ~SPLIT_STATE_MASK;
+	}
 	normalDepthBias = RenderBucket_SignExtendByte(inst->depthBiasNormal);
 	secondaryDepthBias = RenderBucket_SignExtendByte(inst->depthBiasSecondary);
 	RenderBucket_BuildM3x3(inst, mh, viewDepth, &matrixState);
@@ -5048,12 +5074,9 @@ static int RenderBucket_RunInstanceSetupCallback(struct RenderBucketDrawContext 
 	case RB_RETAIL_INST_SETUP_FADE_COLOR:
 		// The syms label calls this Draw_KartGhost, but this is the
 		// Instance+0x5c setup/fade callback.
-		if (ctx->inst->colorRGBA != 0)
-		{
-			RenderBucket_SetFarColorFromInstance(ctx->inst);
-			return 1;
-		}
-
+		// Both ghost primitive writers consume fadeColor, including for
+		// coloured level instances. Leaving it stale can turn the mask's
+		// triangle command into an unrelated GPU command such as MoveImage.
 		{
 			union RenderBucketScratchColor *scratchFade = &RenderBucket_Scratch()->split.fadeColor;
 			int fade = (int)((u32)(0x1000 - (s32)ctx->inst->alphaScale) >> 5);
@@ -5079,8 +5102,134 @@ static int RenderBucket_RunInstanceSetupCallback(struct RenderBucketDrawContext 
 	}
 }
 
+static void RenderBucket_DrawObj(struct RenderBucketDrawContext *ctx, const struct NativeObjMesh *mesh)
+{
+    float angles[4], sine[4], cosine[4];
+    float steering = NativeObj_GetWheelAngles(ctx->inst, angles);
+    float steerSin = sinf(steering), steerCos = cosf(steering);
+    for (int w = 0; w < 4; ++w) { sine[w] = sinf(angles[w]); cosine[w] = cosf(angles[w]); }
+    const MATRIX *mvp = &ctx->idpp->mvp;
+    /* OBJ counter-clockwise winding defines the outward geometric normal.
+     * Correct the projected winding for the camera's Y flip and mirrored
+     * instance scales. Vertex shading normals must not change visibility. */
+    s64 determinant =
+        (s64)mvp->m[0][0] * ((s64)mvp->m[1][1] * mvp->m[2][2] - (s64)mvp->m[1][2] * mvp->m[2][1]) -
+        (s64)mvp->m[0][1] * ((s64)mvp->m[1][0] * mvp->m[2][2] - (s64)mvp->m[1][2] * mvp->m[2][0]) +
+        (s64)mvp->m[0][2] * ((s64)mvp->m[1][0] * mvp->m[2][1] - (s64)mvp->m[1][1] * mvp->m[2][0]);
+    /* Squash intentionally sets scale.y to zero. The resulting flat model
+     * has no volume/orientation, but its projected faces can still have area.
+     * Draw either winding in that case; NCLIP still rejects collapsed edges. */
+    /* Emit native texture bindings inside the ordering table so each triangle
+     * retains the game's viewport, track occlusion and draw ordering. */
+    for (int i = 0; i < mesh->triangleCount; ++i) {
+        const struct NativeObjTriangle *t = &mesh->triangles[i];
+        const struct NativeObjMaterial *m = &mesh->materials[t->material];
+        for (int j = 0; j < 3; ++j) {
+            float x = t->v[j].p[0], y = t->v[j].p[1], z = t->v[j].p[2];
+            int w = t->wheel;
+            if (w >= 0 && (angles[w] != 0 || (w < 2 && steering != 0))) {
+                const float *center = mesh->wheels[w].center;
+                float dx = x * mesh->extent[0] / 1016 - center[0];
+                float dy = y * mesh->extent[1] / 1016 - center[1];
+                float dz = z * mesh->extent[2] / 1016 - center[2];
+                y = (center[1] + dy * cosine[w] - dz * sine[w]) * 1016 / mesh->extent[1];
+                float spunZ = dy * sine[w] + dz * cosine[w];
+                /* Spin about the local axle first, then steer the entire
+                 * front wheel about its centre in authored Y-up coordinates. */
+                if (w < 2) {
+                    x = (center[0] + dx * steerCos + spunZ * steerSin) * 1016 / mesh->extent[0];
+                    spunZ = spunZ * steerCos - dx * steerSin;
+                }
+                z = (center[2] + spunZ) * 1016 / mesh->extent[2];
+            }
+            MTC2(RenderBucket_PackXY((s16)x, (s16)y), j * 2);
+            MTC2((s16)z, j * 2 + 1);
+        }
+        gte_rtpt();
+        /* Read RTPT flags before NCLIP replaces them. Positive SZ alone
+         * does not guarantee a valid projection: divide overflow and clamped
+         * screen/XY coordinates can turn individual faces into large spikes.
+         * IR3 saturation (bit 22) is allowed: distant positive depths above
+         * 32767 remain valid in the unsigned SZ FIFO. */
+        const u32 invalidProjection =
+            (7u << 28) | (7u << 25) | /* MAC1..3 overflow */
+            (3u << 23) |             /* IR1/IR2 saturation */
+            (3u << 17) |             /* SZ saturation / divide overflow */
+            (15u << 13);             /* MAC0 overflow / SXY saturation */
+        if (CFC2(31) & invalidProjection) continue;
+        /* Reject near-plane crossings instead of emitting saturated geometry. */
+        if (MFC2(17) < 16 || MFC2(18) < 16 || MFC2(19) < 16) continue;
+        int facing;
+        gte_nclip();
+        gte_stopz(&facing);
+        if (facing == 0 || (determinant != 0 && ((facing > 0) == (determinant > 0)))) continue;
+        int depth = (MFC2(17) + MFC2(18) + MFC2(19)) / 3 / 32;
+        if (depth < ctx->idpp->depthOffset[0]) depth = ctx->idpp->depthOffset[0];
+        if (depth > ctx->idpp->depthOffset[1]) depth = ctx->idpp->depthOffset[1];
+        if (!ctx->idpp->otRangeNormal) continue;
+        u32 *ot = (u32 *)ctx->idpp->otRangeNormal + depth;
+        size_t bytes = sizeof(POLY_GT3) + 2 * sizeof(DR_PSYX_TEX);
+        if ((char *)ctx->primMem->cursor + bytes >= (char *)ctx->primMem->guardEnd) return;
+        DR_PSYX_TEX *bind = ctx->primMem->cursor;
+        POLY_GT3 *p = (POLY_GT3 *)(bind + 1);
+        DR_PSYX_TEX *reset = (DR_PSYX_TEX *)(p + 1);
+        memset(bind, 0, bytes);
+        bind->code[0] = 0xb1000000 | (m->texture & 0xffffff);
+        bind->code[1] = 256 | (256 << 16);
+        reset->code[0] = 0xb1000000;
+        reset->code[1] = 256 | (256 << 16);
+        setPolyGT3(p);
+        if (!m->texture) setcode(p, 0x30); /* converted below to G3 */
+        CTR_GteStoreSXY3(&p->x0, &p->x1, &p->x2);
+        u8 *colors[3] = {&p->r0, &p->r1, &p->r2};
+        u8 *uv[3] = {&p->u0, &p->u1, &p->u2};
+        for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 3; ++k)
+                colors[j][k] = RenderBucket_SaturateU8((int)(t->v[j].color[k] * m->color[k] * (m->texture ? 128 : 255)));
+            float u = t->v[j].uv[0], v = 1.0f - t->v[j].uv[1];
+            uv[j][0] = RenderBucket_SaturateU8((int)(fminf(1, fmaxf(0, u)) * 255));
+            uv[j][1] = RenderBucket_SaturateU8((int)(fminf(1, fmaxf(0, v)) * 255));
+        }
+        /* Apply the same GTE colour interpolation as retail model primitives.
+         * The instance setup callback supplies the effect colour; alphaScale
+         * controls its strength (including the full black burn effect).
+         * Keep this per draw so shared OBJ assets retain their original colours. */
+        if (ctx->idpp->alphaScale != 0) {
+            for (int j = 0; j < 3; ++j)
+                MTC2((u32)colors[j][0] | ((u32)colors[j][1] << 8) | ((u32)colors[j][2] << 16), 20 + j);
+            MTC2(ctx->idpp->alphaScale, 8);
+            gte_dpct();
+            for (int j = 0; j < 3; ++j) {
+                u32 color = MFC2(20 + j);
+                for (int k = 0; k < 3; ++k) colors[j][k] = (u8)(color >> (k * 8));
+            }
+        }
+        /* addPrim prepends: reset first, then triangle, then binding. */
+        RenderBucket_LinkPrimRaw(ot, reset, 0x02000000);
+        if (m->texture) {
+            RenderBucket_LinkPrimRaw(ot, p, 0x09000000);
+        } else {
+            POLY_G3 flat;
+            memset(&flat, 0, sizeof(flat));
+            setPolyG3(&flat);
+            flat.x0=p->x0; flat.y0=p->y0; flat.x1=p->x1; flat.y1=p->y1; flat.x2=p->x2; flat.y2=p->y2;
+            memcpy(&flat.r0,&p->r0,3); memcpy(&flat.r1,&p->r1,3); memcpy(&flat.r2,&p->r2,3);
+            memcpy(p, &flat, sizeof(flat));
+            RenderBucket_LinkPrimRaw(ot, p, 0x06000000);
+        }
+        RenderBucket_LinkPrimRaw(ot, bind, 0x02000000);
+        ctx->primMem->cursor = (char *)bind + bytes;
+    }
+}
+
 static void RenderBucket_DispatchDrawFunc(struct RenderBucketDrawContext *ctx)
 {
+    if (ctx->mh->unk1 == NATIVE_OBJ_MODEL_MAGIC) {
+        if (!RenderBucket_RunInstanceSetupCallback(ctx)) return;
+        const struct NativeObjMesh *mesh = NativeObj_GetMesh(ctx->inst->model);
+        if (mesh) RenderBucket_DrawObj(ctx, mesh);
+        return;
+    }
 	// NOTE(aalhendi): Retail RenderBucket_Execute copies the per-model color
 	// cache to scratchpad 0x140 before Instance+0x5c setup callback dispatch.
 	RenderBucket_CopyScratchColorCache(ctx);
@@ -5162,7 +5311,7 @@ static int RenderBucket_PrepareDrawContext(struct RenderBucketDrawContext *ctx, 
 		return 0;
 	}
 
-	if ((mh->ptrCommandList == 0) || (mh->ptrColors == 0))
+	if (mh->unk1 != NATIVE_OBJ_MODEL_MAGIC && ((mh->ptrCommandList == 0) || (mh->ptrColors == 0)))
 	{
 		return 0;
 	}

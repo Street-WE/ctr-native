@@ -509,7 +509,7 @@ static u32 DrawLevelOvr1P_GetProjectedOtSlotWord(const struct DrawLevelOvr1PScra
 static int DrawLevelOvr1P_TryConvertNativeMempackPointerToPsxWord(u32 hostWord, u32 *psxWord)
 {
 	const u32 psxRamBase = 0x80000000u;
-	const u32 psxRamSize = 0x200000u;
+	const u32 psxRamSize = (u32)Platform_GetMempackBackingSize();
 	u32 hostPtr = (u32)hostWord;
 	const struct Mempack *pack = DrawLevelOvr1P_FindMempackContaining(hostPtr);
 	if (pack == NULL || pack->endOfMemory == NULL)
@@ -2494,6 +2494,11 @@ static int Ovr226_800a34d4_WriteWaterRenderedClippedRecordAtOtEntry(struct PushB
 	u32 recordSize = DrawLevelOvr1P_GetClipRecordSize(count);
 
 	(void)pb;
+
+	if (!DrawLevelOvr1P_HasClipRecordSpace(recordSize))
+	{
+		return 1;
+	}
 
 	if (!DrawLevelOvr1P_ShouldWriteRenderedClippedRecord(projected, indices, count))
 	{
@@ -4711,6 +4716,11 @@ static int Ovr226_800a4dcc_WriteGround4x1RenderedClippedRecordAtOtEntry(struct P
 		return 1;
 	}
 
+	if (!DrawLevelOvr1P_HasClipRecordSpace(recordSize))
+	{
+		return 1;
+	}
+
 	if (!DrawLevelOvr1P_ShouldWriteRenderedClippedRecord(projected, indices, count))
 	{
 		return 1;
@@ -6035,6 +6045,11 @@ static int Ovr226_800a6d6c_WriteGround4x2RenderedClippedRecordAtOtEntry(struct P
 		return 1;
 	}
 
+	if (!DrawLevelOvr1P_HasClipRecordSpace(recordSize))
+	{
+		return 1;
+	}
+
 	if (!DrawLevelOvr1P_ShouldWriteRenderedClippedRecord(projected, indices, count))
 	{
 		return 1;
@@ -6497,6 +6512,11 @@ static int Ovr226_800a898c_WriteDynamicRenderedClippedRecordAtOtEntry(struct Pus
 		return 1;
 	}
 
+	if (!DrawLevelOvr1P_HasClipRecordSpace(recordSize))
+	{
+		return 1;
+	}
+
 	if (!DrawLevelOvr1P_ShouldWriteRenderedClippedRecord(projected, indices, count))
 	{
 		return 1;
@@ -6921,6 +6941,11 @@ static int Ovr226_800aa5ac_WriteQuad4x4RenderedClippedRecordAtOtEntry(struct Pus
 	(void)pb;
 
 	if (otEntry == NULL)
+	{
+		return 1;
+	}
+
+	if (!DrawLevelOvr1P_HasClipRecordSpace(recordSize))
 	{
 		return 1;
 	}

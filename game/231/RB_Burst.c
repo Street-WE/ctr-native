@@ -393,6 +393,9 @@ void RB_Burst_Init(struct Instance *weaponInst)
 
 	sps->Input1.modelID = modelID;
 
+	SVec3 burstPosition = sps->Input1.pos;
+	RB_Teeth_CheckWeaponSweep(&burstPosition, &burstPosition, sps->Input1.hitRadius);
+
 	sps->Union.ThBuckColl.thread = weaponInst->thread;
 	sps->Union.ThBuckColl.funcCallback = RB_Burst_CollThBucket;
 

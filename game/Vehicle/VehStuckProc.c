@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 enum
 {
@@ -1740,7 +1741,7 @@ void VehStuckProc_Warp_Init(struct Thread *th, struct Driver *d)
 
 	u8 playerID = d->driverID;
 
-	int engine = data.MetaDataCharacters[data.characterIDs[playerID]].engineID;
+	int engine = CharacterRegistry_GetEngineClass(data.characterIDs[playerID]);
 
 	EngineAudio_Stop((engine * VEH_WARP_ENGINE_AUDIO_STRIDE) + playerID);
 

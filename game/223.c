@@ -1,4 +1,6 @@
 #include <common.h>
+#include <HighScoreRegistry.h>
+#include <CharacterIconCache.h>
 
 enum RelicRaceEndMenuConstants
 {
@@ -242,7 +244,9 @@ void RR_EndEvent_DrawHighScore(s16 startX, s32 startY, s16 scoreMode)
 		scoreModeCopy = scoreMode;
 
 		// 12 entries per track, 6 for Time Trial and 6 for Relic Race
-		scoreEntries = &RR_GAME_PROGRESS.highScoreTracks[RR_GAME_TRACKER->levelID].scoreEntry[RR_HIGH_SCORE_ENTRIES_PER_MODE * scoreModeCopy];
+		scoreEntries = &HighScoreRegistry_GetActive()->scoreEntry[RR_HIGH_SCORE_ENTRIES_PER_MODE * scoreModeCopy];
+
+		CharacterIconCache_LoadHighScores(sdata->gGT, scoreEntries, NULL);
 
 		// NOTE(aalhendi): Retail passes identical start and end points.
 		UI_Lerp2D_Linear(CTR_VECTOR_DATA(&(pos)), startX, startYCopy, startX, startYCopy, RR_FRAMES_SINCE_RACE_ENDED, RR_LERP_FRAMES);
@@ -268,7 +272,7 @@ void RR_EndEvent_DrawHighScore(s16 startX, s32 startY, s16 scoreMode)
 		if ((s8)RR_GAME_TRACKER->newHighScoreIndex == rowIndex)
 		{
 			// make name color flash every odd frame
-			nameColor = (RR_GAME_TRACKER->timer & RR_HIGH_SCORE_FLASH_TIMER_BIT) ? WHITE : scoreEntry->characterID + RR_HIGH_SCORE_DRIVER_COLOR_OFFSET;
+			nameColor = (RR_GAME_TRACKER->timer & RR_HIGH_SCORE_FLASH_TIMER_BIT) ? WHITE : CharacterIconCache_GetNameColor(scoreEntry->characterID);
 
 			// flash color of time
 			timeColorSource = (RR_GAME_TRACKER->timer << 1) & flashMask;
@@ -277,7 +281,7 @@ void RR_EndEvent_DrawHighScore(s16 startX, s32 startY, s16 scoreMode)
 		else
 		{
 			timeColor = 0;
-			nameColor = scoreEntry->characterID + RR_HIGH_SCORE_DRIVER_COLOR_OFFSET;
+			nameColor = CharacterIconCache_GetNameColor(scoreEntry->characterID);
 		}
 
 		// Make a rank on the high score list ('1', '2', '3', '4', '5')
@@ -290,7 +294,7 @@ void RR_EndEvent_DrawHighScore(s16 startX, s32 startY, s16 scoreMode)
 		DecalFont_DrawLine(rankString, iconX + 0x20, currentY - 1, FONT_SMALL, WHITE);
 
 		// Draw Character Icon
-		RR_DRAW_POLY_GT4(RR_GAME_TRACKER->ptrIcons[RR_CHARACTER_METADATA[(s16)scoreEntry->characterID].iconID], iconX, iconYBase + (s16)rowOffsetYCopy,
+		RR_DRAW_POLY_GT4(CharacterIconCache_GetHighScore(scoreEntry->characterID), iconX, iconYBase + (s16)rowOffsetYCopy,
 		                 &RR_GAME_TRACKER->backBuffer->primMem, RR_GAME_TRACKER->pushBuffer_UI.ptrOT,
 		                 // color of each corner
 		                 s_highScoreIconColor223, s_highScoreIconColor223, s_highScoreIconColor223, s_highScoreIconColor223, 1, RR_HIGH_SCORE_ICON_SCALE);

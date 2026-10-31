@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterIconCache.h>
 
 global_variable struct RectMenu menuVS;
 global_variable struct RectMenu menuBattle;
@@ -175,9 +176,22 @@ void VB_EndEvent_DrawMenu(void)
 			rankTextY = s_vsStandingsYByPlayerCount[playerCountIndex][VB_POSY_P1 + standingsIndex];
 
 			struct Driver *driver = gGT->drivers[entityID];
-			struct Icon *icon = gGT->ptrIcons[data.MetaDataCharacters[data.characterIDs[driver->driverID]].iconID];
 
-			DecalHUD_DrawPolyFT4(icon, pos.x, rankTextY, &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT, VB_ICON_TRANSPARENCY, VB_ICON_SCALE);
+			int characterID = data.characterIDs[driver->driverID];
+
+			struct Icon *icon =	CharacterIconCache_Get(characterID);
+
+			if (icon != NULL)
+			{
+				DecalHUD_DrawPolyFT4(
+					icon,
+					pos.x,
+					rankTextY,
+					&gGT->backBuffer->primMem,
+					gGT->pushBuffer_UI.ptrOT,
+					VB_ICON_TRANSPARENCY,
+					VB_ICON_SCALE);
+			}
 		}
 		else
 		{
@@ -194,9 +208,23 @@ void VB_EndEvent_DrawMenu(void)
 					continue;
 				}
 
-				struct Icon *icon = gGT->ptrIcons[data.MetaDataCharacters[data.characterIDs[driver->driverID]].iconID];
-				DecalHUD_DrawPolyFT4(icon, pos.x, currRowY + iconSlot * VB_BATTLE_PLAYER_ICON_SPACING, &gGT->backBuffer->primMem, gGT->pushBuffer_UI.ptrOT,
-				                     VB_ICON_TRANSPARENCY, VB_ICON_SCALE);
+				int characterID = data.characterIDs[driver->driverID];
+
+				struct Icon *icon =	CharacterIconCache_Get(characterID);
+
+				if (icon != NULL)
+				{
+					DecalHUD_DrawPolyFT4(
+						icon,
+						pos.x,
+						currRowY +
+							iconSlot * VB_BATTLE_PLAYER_ICON_SPACING,
+						&gGT->backBuffer->primMem,
+						gGT->pushBuffer_UI.ptrOT,
+						VB_ICON_TRANSPARENCY,
+						VB_ICON_SCALE);
+				}
+
 				iconSlot++;
 			}
 

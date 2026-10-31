@@ -23,6 +23,8 @@ void RB_Potion_OnShatter_TeethCallback(struct ScratchpadStruct *sps, void *hitOb
 
 void RB_Potion_OnShatter_TeethSearch(struct Instance *inst)
 {
+	SVec3 position = {inst->matrix.t[0], inst->matrix.t[1], inst->matrix.t[2]};
+	RB_Teeth_CheckWeaponSweep(&position, &position, 0x140);
 	struct ScratchpadStruct *sps = CTR_SCRATCHPAD_PTR(struct ScratchpadStruct, 0x108);
 
 	sps->Input1.pos.x = (s16)inst->matrix.t[0];
@@ -56,6 +58,7 @@ void RB_Potion_ThTick_InAir(struct Thread *t)
 	inst = t->inst;
 	mw = t->object;
 
+	SVec3 previousWeaponPos = {inst->matrix.t[0], inst->matrix.t[1], inst->matrix.t[2]};
 	// adjust position, by velocity, do NOT use parenthesis
 	inst->matrix.t[0] += mw->velocity.x * gGT->elapsedTimeMS >> 5;
 	inst->matrix.t[1] += mw->velocity.y * gGT->elapsedTimeMS >> 5;
@@ -84,6 +87,13 @@ void RB_Potion_ThTick_InAir(struct Thread *t)
 	posTop.x = inst->matrix.t[0];
 	posTop.y = inst->matrix.t[1] + 0x100;
 	posTop.z = inst->matrix.t[2];
+
+	SVec3 currentWeaponPos = {inst->matrix.t[0], inst->matrix.t[1], inst->matrix.t[2]};
+	if (RB_Teeth_CheckWeaponSweep(&previousWeaponPos, &currentWeaponPos, 0x40))
+	{
+		RB_GenericMine_ThDestroy(t, inst, mw);
+		return;
+	}
 
 	sps->Union.QuadBlockColl.searchFlags = COLL_SEARCH_TEST_INSTANCES | COLL_SEARCH_FORCE_INSTANCE_HIT;
 	sps->Union.QuadBlockColl.quadFlagsWanted = QUADBLOCK_FLAG_GROUND | QUADBLOCK_FLAG_TRIGGER;
@@ -190,7 +200,7 @@ void RB_Potion_ThTick_InAir(struct Thread *t)
 		    (instDef->ptrInstance != 0))
 		{
 			// if door is open, quit
-			if ((sdata->doorAccessFlags & 1) == 1)
+			if ((sdata->doorAccessFlags & RB_Teeth_GetAccessFlag(instDef->ptrInstance)) != 0)
 			{
 				return;
 			}

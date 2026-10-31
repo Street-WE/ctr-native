@@ -354,6 +354,48 @@ static u32 PlaySound3D_BuildFlags(struct GameTracker *gGT, int cameraIndex, u32 
 	return HowlSfx_Pack(lr, HOWL_SFX_DISTORTION_NONE, volume, echo);
 }
 
+int PlaySealAmbientSound(struct Instance *inst)
+{
+#ifdef CTR_NATIVE
+	struct GameTracker *gGT = sdata->gGT;
+	s32 closestDir[3] = {0};
+	u32 closestDistance = 9000;
+	int closestCamera = 0;
+	for (int i = 0; i < gGT->numPlyrCurrGame; i++)
+	{
+		s32 dir[3];
+		for (int axis = 0; axis < 3; axis++)
+		{
+			dir[axis] = inst->matrix.t[axis] - CTR_VECTOR_DATA(&gGT->pushBuffer[i].pos)[axis];
+		}
+		u32 distance = SquareRoot0_stub(GTE_GetSquaredLength(dir));
+		if (distance < closestDistance)
+		{
+			closestDistance = distance;
+			closestCamera = i;
+			memcpy(closestDir, dir, sizeof(dir));
+		}
+	}
+	int volume = 0;
+	int pan = 128;
+	if (closestDistance < 9000)
+	{
+		int attenuation = closestDistance <= 300 ? 255 : VehCalc_MapToRange(closestDistance, 300, 9000, 255, 0);
+		volume = (0x3fff * howl_VolumeGet(HOWL_VOLUME_TYPE_FX) / 255) * attenuation / 255;
+		GTE_AudioLR_Inst(&gGT->pushBuffer[closestCamera].matrix_Camera, closestDir);
+		pan = PlaySound3D_CalculateLR(closestDir);
+	}
+	int left = 2 * (255 - pan);
+	int right = 2 * pan;
+	if (left > 255) left = 255;
+	if (right > 255) right = 255;
+	return NativeAudio_UpdateSealLoop(inst, volume * left / 255, volume * right / 255);
+#else
+	(void)inst;
+	return 0;
+#endif
+}
+
 void PlaySound3D(u32 soundID, struct Instance *inst)
 {
 	struct GameTracker *gGT = sdata->gGT;

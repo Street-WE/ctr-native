@@ -1,4 +1,5 @@
 #include <common.h>
+#include <VehExhaust.h>
 
 enum
 {
@@ -6,16 +7,6 @@ enum
 	VEH_EMITTER_EXHAUST_ICON_LOW = 1,
 	VEH_EMITTER_EXHAUST_ICON_WATER = 7,
 	VEH_EMITTER_EXHAUST_WATER_Y_LIMIT = FP8_ONE,
-	VEH_EMITTER_EXHAUST_VEL_Y = 0x400,
-	VEH_EMITTER_EXHAUST_VEL_Z = -0x400,
-	VEH_EMITTER_EXHAUST_POS_X_NUM = 9,
-	VEH_EMITTER_EXHAUST_POS_X_SHIFT = 3,
-	VEH_EMITTER_EXHAUST_POS_Y_NUM = 7,
-	VEH_EMITTER_EXHAUST_POS_Y_SHIFT = 1,
-	VEH_EMITTER_EXHAUST_POS_Z_NUM = -0x38,
-	VEH_EMITTER_EXHAUST_POS_Z_SHIFT = 4,
-	VEH_EMITTER_EXHAUST_POS_SECOND_X_NUM = -0x12,
-	VEH_EMITTER_EXHAUST_POS_SECOND_X_SHIFT = 4,
 	VEH_EMITTER_TURBO_METER_COLOR_MIN = 129,
 	VEH_EMITTER_TURBO_ROOM_WARNING_PAD = 2,
 	VEH_EMITTER_TURBO_ROOM_WARNING_SCALE = 32,
@@ -818,31 +809,31 @@ static int VehEmitter_ShouldSkipExhaust(struct Thread *thread, struct Driver *d)
 	return 0;
 }
 
-static void VehEmitter_ExhaustPair(struct Thread *thread, struct Driver *d)
+static void VehEmitter_ExhaustOutlets(struct Thread *thread, struct Driver *d)
 {
 	struct Instance *inst = thread->inst;
-	MATRIX *m = &inst->matrix;
-	SVECTOR local;
-	VECTOR exhaustPos;
-	VECTOR exhaustVel;
+	const struct ExhaustTemplate *layout = VehExhaust_GetTemplate(data.characterIDs[d->driverID]);
 
-	gte_SetRotMatrix(m);
+	for (int i = 0; i < VehExhaust_GetCount(layout); i++)
+	{
+		const struct ExhaustOutlet *outlet = &layout->outlets[i];
+		if (VehExhaust_GetScale(outlet->smokeScale) == 0) continue;
 
-	local.vx = 0;
-	local.vy = VEH_EMITTER_EXHAUST_VEL_Y;
-	local.vz = VEH_EMITTER_EXHAUST_VEL_Z;
-	local.pad = 0;
-	VehEmitter_RotVec(&local, &exhaustVel);
+		SVECTOR local;
+		VECTOR exhaustPos;
+		VECTOR exhaustVel;
+		MATRIX rotation;
+		VehExhaust_GetRotation(outlet, inst, &rotation);
+		gte_SetRotMatrix(&rotation);
+		local = (SVECTOR){0, 0x400, -0x400, 0};
+		VehEmitter_RotVec(&local, &exhaustVel);
 
-	local.vx = (s16)((inst->scale.x * VEH_EMITTER_EXHAUST_POS_X_NUM) >> VEH_EMITTER_EXHAUST_POS_X_SHIFT);
-	local.vy = (s16)((inst->scale.y * VEH_EMITTER_EXHAUST_POS_Y_NUM) >> VEH_EMITTER_EXHAUST_POS_Y_SHIFT);
-	local.vz = (s16)((inst->scale.z * VEH_EMITTER_EXHAUST_POS_Z_NUM) >> VEH_EMITTER_EXHAUST_POS_Z_SHIFT);
-	VehEmitter_RotVec(&local, &exhaustPos);
-	VehEmitter_Exhaust(d, &exhaustPos, &exhaustVel);
-
-	local.vx = (s16)((inst->scale.x * VEH_EMITTER_EXHAUST_POS_SECOND_X_NUM) >> VEH_EMITTER_EXHAUST_POS_SECOND_X_SHIFT);
-	VehEmitter_RotVec(&local, &exhaustPos);
-	VehEmitter_Exhaust(d, &exhaustPos, &exhaustVel);
+		VehExhaust_GetLocalPosition(outlet, inst, false, &local);
+		gte_SetRotMatrix(&inst->matrix);
+		VehEmitter_RotVec(&local, &exhaustPos);
+		struct Particle *particle = VehEmitter_Exhaust(d, &exhaustPos, &exhaustVel);
+		if (particle != NULL) VehExhaust_ScaleSmoke(particle, outlet->smokeScale);
+	}
 }
 
 void VehEmitter_DriverMain(struct Thread *thread, struct Driver *d)
@@ -881,7 +872,7 @@ void VehEmitter_DriverMain(struct Thread *thread, struct Driver *d)
 
 	if (!VehEmitter_ShouldSkipExhaust(thread, d))
 	{
-		VehEmitter_ExhaustPair(thread, d);
+		VehEmitter_ExhaustOutlets(thread, d);
 	}
 
 	if (d->burnTimer != 0)

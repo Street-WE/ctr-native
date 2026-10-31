@@ -1784,7 +1784,7 @@ struct Data
 
             .colors =
                 {
-                    {0xC8FF, 0xC8FF, 0xFF, 0xFF},             // ORANGE
+                    {0x05E5F1, 0x05E5F1, 0x00C2C4, 0x00C2C4},             // ORANGE Changed to yellow
                     {0xFFC8C8, 0xFFC8C8, 0xE1A0A0, 0xE1A0A0}, // PERIWINKLE
                     {0xC880, 0xC880, 0x80, 0x80},             // ORANGE_DARKENED
                     {0xFF, 0xFF, 0x80, 0x80},                 // RED

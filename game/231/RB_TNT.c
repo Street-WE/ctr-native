@@ -1,4 +1,5 @@
 #include <common.h>
+#include <CharacterRegistry.h>
 
 // In air, after spamming L1 or R1,
 // will explode on impact with ground
@@ -231,12 +232,18 @@ LAB_800ad5f8:
 
 static const s16 s_tntThrowHeadY[0x10] = {32, 32, 64, 32, 32, 48, 32, 32, 48, 64, 32, 48, 56, 24, 32, 56};
 
+static s16 RB_TNT_GetHeadHeight(const struct Driver *driver)
+{
+	int characterID = data.characterIDs[driver->driverID];
+	// The retail table has 16 entries, not one entry per extended roster ID.
+	return s_tntThrowHeadY[CharacterRegistry_GetDriverPackID(characterID)];
+}
+
 // NOTE(aalhendi): Native uses retail character-height table bytes from 0x800b2ac4.
 void RB_TNT_ThTick_ThrowOnHead(struct Thread *t)
 {
 	struct MineWeapon *mw;
 	struct Instance *inst;
-	s16 *array;
 	struct GameTracker *gGT;
 
 	SVec3 rot;
@@ -259,9 +266,7 @@ void RB_TNT_ThTick_ThrowOnHead(struct Thread *t)
 	// if TNT is moving downward
 	if (mw->velocity.y < 0)
 	{
-		array = (s16 *)s_tntThrowHeadY;
-
-		distHead = array[data.characterIDs[mw->driverTarget->driverID]];
+		distHead = RB_TNT_GetHeadHeight(mw->driverTarget);
 
 		// if TNT landed on head
 		if ((mw->deltaPos.y < distHead) && (mw->deltaPos.y = distHead, inst->scale.x == 0x800))

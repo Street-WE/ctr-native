@@ -20,7 +20,8 @@
 #define TPAGE_WIDTH            (256)
 #define TPAGE_HEIGHT           (256)
 
-#define MAX_VERTEX_BUFFER_SIZE (1u << 16)
+// Custom OBJ racers share this buffer with the track and effects.
+#define MAX_VERTEX_BUFFER_SIZE (1u << 20)
 
 typedef struct
 {

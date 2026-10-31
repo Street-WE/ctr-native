@@ -281,6 +281,11 @@ void howl_UnPauseAudio()
 
 void howl_StopAudio(b32 boolErasePauseBackup, b32 boolEraseMusic, b32 boolDestroyAllFX)
 {
+#ifdef CTR_NATIVE
+	// Unpausing clears retail FX before restoring them; retain the WAV loop's
+	// paused playback position until MainFrame resumes it.
+	if (boolDestroyAllFX && (!sdata->boolSoundPaused || boolErasePauseBackup || boolEraseMusic)) NativeAudio_StopSealLoops();
+#endif
 	if (boolEraseMusic != 0)
 	{
 		CseqMusic_StopAll();
